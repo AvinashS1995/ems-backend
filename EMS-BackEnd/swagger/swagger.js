@@ -11,7 +11,7 @@ const swaggerDefinition = {
   },
   servers: [
     {
-      url: 'http://localhost:3000',
+      url: 'https://ems-backend-api.onrender.com',
       description: 'Development server',
     },
   ],
