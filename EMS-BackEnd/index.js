@@ -17,7 +17,7 @@ dotenv.config({path:'./.env'});
 ConnectToDatabase();
 const app = express();
 app.use(cors({
-    origin: 'http://localhost:4200',
+    origin: ['http://localhost:4200', 'https://ems-project-kappa.vercel.app'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization']
   }));
