@@ -4,12 +4,12 @@ import dotenv from 'dotenv';
 import authRouter from './Routes/authRoute.js';
 // import verifyToken from './Middlewares/verifyTokenMiddleware.js';
 import menuRouter from './Routes/menuRoute.js'
-import uploadRoute from './Routes/uploadRoute.js';
 import attendenceRoute from './Routes/attendenceRoute.js';
 import leaveRoute from './Routes/leaveRoute.js';
+import fileRoute from './Routes/fileRoute.js';
 import { ConnectToDatabase } from './db/db.js';
 import setupSwagger from './swagger/swagger.js';
-import startCron from './crons/fetchHolidays.js';
+import startCron from './crons/cronRun.js';
 
 
 dotenv.config({path:'./.env'});
@@ -25,9 +25,9 @@ app.use(express.json());
 app.use('/api/auth', authRouter);
 // app.use(verifyToken);
 app.use('/api/menu', menuRouter)
-app.use('/api/upload', uploadRoute)
 app.use('/api/attendence', attendenceRoute)
 app.use('/api/leave', leaveRoute)
+app.use('/api/file', fileRoute);
 
 
 setupSwagger(app);

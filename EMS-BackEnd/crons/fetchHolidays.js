@@ -39,7 +39,7 @@ export async function fetchAndSaveYearHolidays() {
     }
 }
 
-export default function startCron() {
+export default function startGoogleCalaenderHolidayCron() {
     cron.schedule('0 0 1 1 *', () => {
         console.log('[CRON] Running yearly holiday fetch...');
         fetchAndSaveYearHolidays();

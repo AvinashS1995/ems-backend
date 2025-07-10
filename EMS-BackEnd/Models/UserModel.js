@@ -63,8 +63,8 @@ const userSchema = new mongoose.Schema({
         required: [true, 'Work Type is requied field']
     },
     profileImage: {
-        data: Buffer,
-        contentType: String,
+        type: String,
+        
       },
     createAt: {
         type: Date, default: Date.now
@@ -75,6 +75,23 @@ const userSchema = new mongoose.Schema({
 })
 
 const User = mongoose.model("User", userSchema);
+
+const userReportingSchema = new mongoose.Schema({
+  employee: {
+    type: String,
+    required: true,
+  },
+  reportedBy: {
+    type: String,
+    required: true,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+const UserReporting = mongoose.model("UserReporting", userReportingSchema);
 
 const typeSchema = new mongoose.Schema({
     entityValue: {
@@ -106,4 +123,4 @@ const typeSchema = new mongoose.Schema({
 const Type = mongoose.model("Type", typeSchema)
 
 
-export  { User, Type };
+export  { User, UserReporting, Type };

@@ -1,11 +1,11 @@
-import express from 'express';
-import { downloadFile, generateUploadUrl, uploadFile } from '../Controllers/FileController.js';
+// import express from 'express';
+// import { downloadFile, generateUploadUrl, uploadFile } from '../Controllers/FileController.js';
 
 
-const router = express.Router();
+// const router = express.Router();
 
-router.post('/generate-upload-url', generateUploadUrl)
-router.post('/uploadFile', uploadFile)
-router.post('/downloadFile', downloadFile)
+// router.post('/generate-upload-url', generateUploadUrl)
+// router.post('/uploadFile', uploadFile)
+// router.post('/downloadFile', downloadFile)
 
-export default router;
+// export default router;
