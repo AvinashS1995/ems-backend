@@ -5,8 +5,8 @@ import { GridFSBucket } from 'mongodb';
 
 
 dotenv.config({path:'./.env'});
-const mongoURI = process.env.MONGO_DB_LOCAL_URL;
-// const mongoURI = process.env.MONGO_DB_LIVE_URL;
+// const mongoURI = process.env.MONGO_DB_LOCAL_URL;
+const mongoURI = process.env.MONGO_DB_LIVE_URL;
 // console.log(`Process dotenv ${process.env}`);
 
 let gfs;

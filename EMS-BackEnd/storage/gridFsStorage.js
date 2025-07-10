@@ -4,8 +4,8 @@ import UploadFileToken from "../Models/uploadFileModel.js";
 import multer from "multer";
 dotenv.config({ path: "./.env" });
 
-// const mongoURI = process.env.MONGO_DB_LIVE_URL;
-const mongoURI = process.env.MONGO_DB_LOCAL_URL;
+const mongoURI = process.env.MONGO_DB_LIVE_URL;
+// const mongoURI = process.env.MONGO_DB_LOCAL_URL;
 
 // GridFS Storage instance
 const storage = new GridFsStorage({
