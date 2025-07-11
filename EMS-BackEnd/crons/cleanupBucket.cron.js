@@ -2,8 +2,8 @@ import cron from "node-cron";
 import { ListObjectsV2Command, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import File from "../Models/fileModel.js";
 import sendEmailToAdmin from "../mail/sendMailtoAdmin.js";
-import s3Client from "../storage/s3.config.js";
 import dotenv from "dotenv";
+import { s3Client } from "../storage/s3.config.js";
 
 dotenv.config({ path: "./.env" });
 

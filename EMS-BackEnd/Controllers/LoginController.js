@@ -4,10 +4,10 @@ import jwt from "jsonwebtoken";
 import OTP from "../Models/otpModel.js";
 import transporter from "../mail/transporter.js";
 import dotenv from "dotenv";
-import { generateRandomKey, encrypt } from '../common/common.js';
+import { generateRandomKey, encrypt } from "../common/common.js";
+import { getPresignedUrl } from "../storage/s3.config.js";
 
 dotenv.config({ path: "./.env" });
-
 
 // Login API Method
 const Login = async (req, res) => {
@@ -17,7 +17,7 @@ const Login = async (req, res) => {
     const secretKey = generateRandomKey();
     const encryptedSecretKey = encrypt(secretKey);
     if (!user) {
-     return res.status(404).json({
+      return res.status(404).json({
         status: "fail",
         message: "User Not Found..!",
       });
@@ -26,7 +26,7 @@ const Login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-     return res.status(404).json({
+      return res.status(404).json({
         status: "fail",
         message: "Wrong Password..!",
       });
@@ -37,30 +37,40 @@ const Login = async (req, res) => {
     //   process.env.JWT_SECRET_KEY,
     //   { expiresIn: "10d" }
     // );
+
+    const fileKey = user.profileImage || "";
+    if(fileKey) {
+    const presignedUrl = await getPresignedUrl(fileKey, 3600);
+    user.profileImage = presignedUrl;
+    }
+    
+
     const token = jwt.sign(
-      { _id: user._id, 
-        empNo: user.empNo, 
-        name: user.name, 
-        email: user.email, 
+      {
+        _id: user._id,
+        empNo: user.empNo,
+        name: user.name,
+        email: user.email,
         mobile: user.mobile,
-        role: user.role, 
-        type: user.type, 
-        status: user.status, 
-        teamLeader: user.teamLeader, 
-        manager: user.manager, 
-        hr: user.hr, 
-        designation: user.designation, 
-        joiningDate: user.joiningDate, 
-        salary: user.salary, 
-        workType: user.workType, 
+        role: user.role,
+        type: user.type,
+        status: user.status,
+        teamLeader: user.teamLeader,
+        manager: user.manager,
+        hr: user.hr,
         designation: user.designation,
-        loginUserSecretKey: secretKey 
+        joiningDate: user.joiningDate,
+        salary: user.salary,
+        workType: user.workType,
+        designation: user.designation,
+        profileImage: user.profileImage,
+        loginUserSecretKey: secretKey,
       },
       process.env.JWT_SECRET_KEY,
       { expiresIn: "10d" }
     );
 
-   return res.status(200).json({
+    return res.status(200).json({
       status: "success",
       message: "Login Successfully..!",
       token,
@@ -70,7 +80,7 @@ const Login = async (req, res) => {
         name: user.name,
         role: user.role,
         email: user.email,
-        empNo: user.empNo
+        empNo: user.empNo,
       },
     });
   } catch (error) {
@@ -112,7 +122,6 @@ const VerifyEmail = async (req, res) => {
   }
 };
 
-
 // Send OTP API Method
 const sendOtp = async (req, res) => {
   try {
@@ -127,7 +136,6 @@ const sendOtp = async (req, res) => {
     // Set OTP expiry (5 minutes from now)
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-    
     await OTP.create({ email, otp: hashedOtp, expiresAt });
 
     // Send Email
@@ -167,7 +175,7 @@ const sendOtp = async (req, res) => {
       });
     });
   } catch (error) {
-   return res.status(500).json({
+    return res.status(500).json({
       status: "fail",
       message: error.message,
     });
@@ -218,7 +226,7 @@ const resendOtp = async (req, res) => {
 
     transporter.sendMail(mailOptions, (err, info) => {
       if (err) {
-        console.log(err)
+        console.log(err);
         return res.status(500).json({
           status: "fail",
           message: err.message,
@@ -231,7 +239,7 @@ const resendOtp = async (req, res) => {
       });
     });
   } catch (error) {
-   return res.status(500).json({
+    return res.status(500).json({
       status: "fail",
       message: error.message,
     });
@@ -286,65 +294,67 @@ const verifyOtp = async (req, res) => {
 //  Reset Password API Password
 const resetPassword = async (req, res) => {
   try {
-      const { email, newPassword, confirmPassword } = req.body;
+    const { email, newPassword, confirmPassword } = req.body;
 
-      if (!newPassword || !confirmPassword) {
-          return res.status(400).json({ 
-            status: "fail",
-            message: "All fields are required" 
-          });
-      }
-
-      if (newPassword !== confirmPassword) {
-          return res.status(400).json({
-            status: "fail", 
-            message: "Passwords do not match" 
-          });
-      }
-
-      const user = await User.findOne({ email });
-      
-      if (!user) {
-        return res.status(404).json({
-          status: "fail", 
-          message: "User not found" 
-        });
-
-      }
-
-      // Hash new password
-      user.password = await bcrypt.hash(newPassword, 10);
-      await user.save();
-
-      return res.status(200).json({
-        status: "sucess", 
-        message: "Password reset successfully" 
+    if (!newPassword || !confirmPassword) {
+      return res.status(400).json({
+        status: "fail",
+        message: "All fields are required",
       });
+    }
 
-  } catch (error) {
-      return res.status(500).json({
-        status: "fail", 
-        message: error.message 
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Passwords do not match",
       });
-  }
-};
+    }
 
-const LogOut = async (req, res) => {
+    const user = await User.findOne({ email });
 
-  try {
+    if (!user) {
+      return res.status(404).json({
+        status: "fail",
+        message: "User not found",
+      });
+    }
+
+    // Hash new password
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
 
     return res.status(200).json({
-      status: "success",
-      message: "Logged out successfully.",
+      status: "sucess",
+      message: "Password reset successfully",
     });
-  
   } catch (error) {
     return res.status(500).json({
       status: "fail",
       message: error.message,
     });
   }
-}
+};
 
+const LogOut = async (req, res) => {
+  try {
+    return res.status(200).json({
+      status: "success",
+      message: "Logged out successfully.",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "fail",
+      message: error.message,
+    });
+  }
+};
 
-export { Login, VerifyEmail, sendOtp, resendOtp, verifyOtp, resetPassword, LogOut };
+export {
+  Login,
+  VerifyEmail,
+  sendOtp,
+  resendOtp,
+  verifyOtp,
+  resetPassword,
+  LogOut,
+};

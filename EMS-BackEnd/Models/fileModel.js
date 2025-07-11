@@ -5,7 +5,7 @@ const fileSchema = new mongoose.Schema({
   fileKey: String,
   fileType: String,
   fileUrl: String,
-  previewUrl: String,
+  presignFileUrl: String,
   uploadedAt: { type: Date, default: Date.now },
 });
 

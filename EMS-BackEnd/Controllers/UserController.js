@@ -1,9 +1,9 @@
 import { ConnectToDatabase } from "../db/db.js";
 import { Type, User } from "../Models/UserModel.js";
 import bcrypt from "bcrypt";
+import { getPresignedUrl } from "../storage/s3.config.js";
 
 const CreateUser = async (req, res) => {
-
   try {
     const {
       name,
@@ -47,18 +47,18 @@ const CreateUser = async (req, res) => {
       });
     }
 
-     // Find the last inserted employee sorted by empNo
-     const lastEmp = await User.findOne()
-     .sort({ empNo: -1 })
-     .collation({ locale: "en_US", numericOrdering: true });
+    // Find the last inserted employee sorted by empNo
+    const lastEmp = await User.findOne()
+      .sort({ empNo: -1 })
+      .collation({ locale: "en_US", numericOrdering: true });
 
-   let empNo = 'EMP001'; 
+    let empNo = "EMP001";
 
-   if (lastEmp && lastEmp.empNo) {
-     const lastNumber = parseInt(lastEmp.empNo.replace('EMP', ''));
-     const newNumber = lastNumber + 1;
-     empNo = `EMP${String(newNumber).padStart(3, '0')}`;
-   }
+    if (lastEmp && lastEmp.empNo) {
+      const lastNumber = parseInt(lastEmp.empNo.replace("EMP", ""));
+      const newNumber = lastNumber + 1;
+      empNo = `EMP${String(newNumber).padStart(3, "0")}`;
+    }
 
     const password = "Admin@1234";
     const hashPassword = await bcrypt.hash(password, 10);
@@ -101,10 +101,10 @@ const CreateUser = async (req, res) => {
 
 const GetUserList = async (req, res) => {
   try {
-    const { name, role , status, type} = req.body;
+    const { name, role, status, type } = req.body;
 
     // const query = entityValue ? { entityValue } : {};
-    
+
     const query = {};
 
     if (role) {
@@ -120,7 +120,7 @@ const GetUserList = async (req, res) => {
     }
 
     if (name) {
-      query.name = { $regex: '^' + name, $options: 'i' };
+      query.name = { $regex: "^" + name, $options: "i" };
     }
 
     const page = parseInt(req.body.page) || 1;
@@ -130,8 +130,20 @@ const GetUserList = async (req, res) => {
     const total = await User.countDocuments();
     // const data = await User.find().skip(skip).limit(limit);
 
-    
-      const users = await User.find(query).skip(skip).limit(limit);
+    const users = await User.find(query).skip(skip).limit(limit);
+
+    const userList = await Promise.all(
+      users.map(async (user) => {
+        if (user.profileImage) {
+          const fileKey = user.profileImage; // stored fileKey
+          const presignedUrl = await getPresignedUrl(fileKey, 3600);
+          user.profileImage = presignedUrl;
+        } else {
+          user.profileImage = null;
+        }
+        return user;
+      })
+    );
 
     res.status(200).json({
       status: "success",
@@ -140,8 +152,7 @@ const GetUserList = async (req, res) => {
         currentPage: page,
         totalPages: Math.ceil(total / limit),
         totalRecords: total,
-        users
-        
+        userList,
       },
     });
   } catch (err) {
@@ -174,7 +185,6 @@ const UpdateEmployeeList = async (req, res) => {
 
     const existingType = await User.findById(id);
     // console.log(existingType);
-    
 
     if (!existingType) {
       return res.status(404).json({
@@ -203,7 +213,7 @@ const UpdateEmployeeList = async (req, res) => {
       status: "success",
       message: "Record(s) Updated Successfully!",
       data: {
-        existingType
+        existingType,
       },
     });
   } catch (err) {
@@ -231,7 +241,7 @@ const DeleteEmployeeList = async (req, res) => {
       status: "success",
       message: "Record(s) Deleted Successfully..!",
       data: {
-        deleted
+        deleted,
       },
     });
   } catch (err) {
@@ -241,7 +251,6 @@ const DeleteEmployeeList = async (req, res) => {
     });
   }
 };
-
 
 const CreateTypeList = async (req, res) => {
   try {
@@ -271,7 +280,6 @@ const CreateTypeList = async (req, res) => {
 
     await type.save();
 
-   
     res.status(201).json({
       status: "success",
       message: "Successfully Created!",
@@ -292,10 +300,10 @@ const CreateTypeList = async (req, res) => {
 
 const GetTypeList = async (req, res) => {
   try {
-    const { entityValue , typeLabel} = req.body;
+    const { entityValue, typeLabel } = req.body;
 
     // const query = entityValue ? { entityValue } : {};
-    
+
     const query = {};
 
     if (entityValue) {
@@ -306,8 +314,9 @@ const GetTypeList = async (req, res) => {
       query.typeLabel = typeLabel;
     }
 
-    
-      const types = await Type.find(query).select('_id entityValue typeLabel typeValue description');
+    const types = await Type.find(query).select(
+      "_id entityValue typeLabel typeValue description"
+    );
 
     res.status(200).json({
       status: "success",
@@ -330,7 +339,6 @@ const UpdateTypeList = async (req, res) => {
 
     const existingType = await Type.findById(id);
     // console.log(existingType);
-    
 
     if (!existingType) {
       return res.status(404).json({
@@ -395,4 +403,13 @@ const DeleteTypeList = async (req, res) => {
   }
 };
 
-export { CreateUser, GetUserList, UpdateEmployeeList, DeleteEmployeeList, CreateTypeList, GetTypeList, UpdateTypeList, DeleteTypeList };
+export {
+  CreateUser,
+  GetUserList,
+  UpdateEmployeeList,
+  DeleteEmployeeList,
+  CreateTypeList,
+  GetTypeList,
+  UpdateTypeList,
+  DeleteTypeList,
+};
