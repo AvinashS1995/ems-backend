@@ -74,7 +74,7 @@ const GetMenu = async (req, res) => {
       roleMenu.menus.forEach(menu => {
         accessMap[menu.menuId.toString()] = menu.access;
       });
-      console.log(accessMap)
+      // console.log(accessMap)
     }
 
     // Fetch all parent menus
@@ -90,7 +90,7 @@ const GetMenu = async (req, res) => {
     // Add access info to parent and child menus
     const enrichedMenus = parentMenus.map(menu => {
       const access = accessMap[menu._id.toString()];
-      console.log(access)
+      // console.log(access)
 
       const enrichedChildren = (menu.childMenu || []).map(child => {
         return {
@@ -106,7 +106,7 @@ const GetMenu = async (req, res) => {
       };
     });
 
-    console.log(enrichedMenus)
+    // console.log(enrichedMenus)
 
     return res.status(200).json({
       status: "success",

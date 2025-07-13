@@ -20,9 +20,19 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             properties:
- *               name:
+ *               firstName:
+ *                 type: string
+ *               middleName:
+ *                 type: string
+ *               lastName:
+ *                 type: string
+ *               dob:
+ *                 type: string
+ *               gender:
  *                 type: string
  *               email:
+ *                 type: string
+ *               address:
  *                 type: string
  *               mobile:
  *                 type: string
@@ -32,9 +42,11 @@ const router = express.Router();
  *                 type: string
  *               type:
  *                 type: string
- *               teamLeader:
+ *               reportedBy:
  *                 type: string
  *               designation:
+ *                 type: string
+ *               department:
  *                 type: string
  *               joiningDate:
  *                 type: string
@@ -44,7 +56,6 @@ const router = express.Router();
  *                 type: string
  *               profileImage:
  *                 type: string
- *                 format: binary
  *     responses:
  *       201:
  *         description: User created successfully
@@ -377,6 +388,8 @@ router.post('/save-type-list', authenticateToken, CreateTypeList)
  *                 type: string
  *               typeLabel:
  *                 type: string
+ *               departmentType:
+ *                 type: string
  *     responses:
  *       201:
  *         description: User created successfully
@@ -405,6 +418,8 @@ router.post('/get-type-list', authenticateToken, GetTypeList)
  *               entityValue:
  *                 type: string
  *               typeLabel:
+ *                 type: string
+ *               departmentType:
  *                 type: string
  *               description:
  *                 type: string

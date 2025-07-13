@@ -1,144 +1,160 @@
+import { getApprovalStepEmployees } from "../common/employee.utilis.js";
+import { Approval } from "../Models/approvalSchema.js";
 import { Holidays } from "../Models/holidayModel.js";
-import { Leave } from "../Models/leaveModel.js"
-import { User } from "../Models/UserModel.js"
+import { Leave } from "../Models/leaveModel.js";
+import { User } from "../Models/UserModel.js";
 
+const typeMap = {
+  "Paid Leaves (PL)": "Leave Request",
+  "Sick Leave (SL)": "Leave Request",
+  "Casual Leave (CL)": "Leave Request",
+  "Maternity Leave (ML)": "Leave Request", // ✅ Fixed
+  "Paternity Leave (PTL)": "Leave Request",
+  "Bereavement Leave (BL)": "Leave Request",
+  "Compensatory Off": "Leave Request",
+  "Marriage Leave (MRL)": "Leave Request",
+  "Leave Without Pay (LWP)": "Leave Request",
+};
 
 const GetUpcomingHolidays = async (req, res) => {
+  try {
+    const today = new Date();
+    const holidays = await Holidays.find({ date: { $gte: today } })
+      .sort({ date: 1 })
+      .select("-__v");
 
-    try {
-
-        const today = new Date();
-        const holidays = await Holidays.find({ date: { $gte: today } }).sort({ date: 1 }).select('-__v');
-
-        if(!holidays) {
-            return res.status(404).json({
-                status: 'fail',
-                message: 'Holidays Not Found..!'
-            })
-        }
-
-        res.status(200).json({
-            status: 'success',
-            message: 'Record(s) Successfully Fetched..!',
-            data: {
-                upComingHolidays: holidays
-            }
-        })
-        
-    } catch (error) {
-console.log(error)
-        res.status(500).json({
-            status: 'fail',
-            message: error.message
-        })
-        
+    if (!holidays) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Holidays Not Found..!",
+      });
     }
-}
+
+    res.status(200).json({
+      status: "success",
+      message: "Record(s) Successfully Fetched..!",
+      data: {
+        upComingHolidays: holidays,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      status: "fail",
+      message: error.message,
+    });
+  }
+};
 
 const saveEmployeeLeave = async (req, res) => {
+  try {
+    const {
+      empNo,
+      name,
+      leaveType,
+      leaveDuration,
+      fromDate,
+      toDate,
+      reasonType,
+      reasonComment,
+    } = req.body;
 
-    try {
-
-        const { empNo, name, leaveType, leaveDuration, fromDate, toDate,
-            reasonType, reasonComment } = req.body;
-
-            const newLeave = new Leave({
-              empNo,
-              name,
-              leaveType,
-              leaveDuration,
-              fromDate,
-              toDate,
-              reasonType,
-              reasonComment,
-              status: 'Pending for Team Leader',
-            });
-
-            const savedLeave = await newLeave.save();
-
-            res.status(201).json({
-              message: "Leave application submitted successfully",
-              data: {
-                savedLeave
-              },
-            });
-        
-    } catch (error) {
-        res.status(500).json({
-            status: 'fail',
-            message: error.message
-        })
+    // 1. Fetch the employee
+    const employee = await User.findOne({ empNo });
+    if (!employee) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Employee not found",
+      });
     }
-}
 
+    // 2. Map leaveType to approval typeName
+    const typeName = typeMap[leaveType];
+    if (!typeName) {
+      return res.status(400).json({
+        status: "fail",
+        message: `Approval mapping not found for leave type: ${leaveType}`,
+      });
+    }
 
-// const approvalFlow = async (req, res) => {
-//   try {
-//     const { leaveId, action, role, approverComment, updatedBy } = req.body;
+    // 3. Fetch approval flow
+    const approvalFlow = await Approval.findOne({ typeName });
+    if (!approvalFlow) {
+      return res.status(404).json({
+        status: "fail",
+        message: `Approval flow not found for ${leaveType}`,
+      });
+    }
 
-//     const leave = await Leave.findById(leaveId);
+    // 4. Insert the "Submitted" entry for the applicant
+    const initialStatus = [
+      {
+        role: employee.role,
+        empNo,
+        name,
+        status: "Submitted",
+        comments: reasonComment,
+        actionDate: new Date(),
+      },
+    ];
 
-//     if (!leave) {
-//       return res.status(404).json({
-//         status: 'fail', 
-//         message: 'Leave not found' 
-//     });
-//     }
+    // 5. Get the approval stepper data, skipping self from reapproval
+    const stepperData = await getApprovalStepEmployees(
+      empNo,
+      approvalFlow.listApprovalFlowDetails,
+      initialStatus,
+      employee.role // this role will be skipped in stepper
+    );
 
-//     const expectedStatus = {
-//       TL: 'Pending for TL',
-//       Manager: 'Pending for Manager',
-//       HR: 'Pending for HR',
-//     };
+    // 6. Construct the full approvalStatus array
+    const approvalStatus = [
+      ...initialStatus,
+      ...stepperData.map((step) => ({
+        role: step.role,
+        empNo: step.empNo,
+        name: step.name.split(" - ")[0],
+        status: step.status,
+        comments: step.comments,
+        actionDate: step.actionDate,
+      })),
+    ];
 
-//     if (leave.status !== expectedStatus[role]) {
-//       return res.status(400).json({ 
-//         status: 'fail',
-//         message: `Leave not pending with ${role}` 
-//     });
-//     }
+    // 7. Determine initial status
+    const pendingStep = stepperData.find((s) => s.status === "Pending");
+    const status = pendingStep ? `Pending for ${pendingStep.role}` : "Approved";
 
-//     let newStatus = '';
-//     if (action === 'approve') {
-//       newStatus =
-//         role === 'TL' ? 'Pending for Manager' :
-//         role === 'Manager' ? 'Pending for HR' :
-//         'Final Approved';
+    // 8. Save the leave record
+    const newLeave = new Leave({
+      empNo,
+      name,
+      leaveType,
+      leaveDuration,
+      fromDate,
+      toDate,
+      reasonType,
+      reasonComment,
+      status,
+      approvalStatus,
+    });
 
-//     } else if (action === 'reject') {
-//       newStatus = `Rejected by ${role}`;
+    const savedLeave = await newLeave.save();
 
-//     } else {
-//       return res.status(400).json({
-//         status: 'fail', 
-//         message: 'Invalid action' 
-//     });
+    // 9. Respond
+    res.status(201).json({
+      message: "Leave application submitted successfully",
+      data: {
+        savedLeave,
+      },
+    });
 
-//     }
-
-//     leave.status = newStatus;
-//     leave.approverComment = approverComment;
-//     leave.updatedBy = updatedBy;
-//     leave.updateAt = new Date();
-
-//     await leave.save();
-
-//     res.status(200).json({
-//       status: 'success',  
-//       message: `Leave ${action}d by ${role}`,
-//       data: {
-//         leave
-//       },
-//     });
-
-//   } catch (error) {
-
-//     res.status(500).json({ 
-//         status: 'fail', 
-//         error: error.message 
-//     });
-//   }
-// };
+  } catch (error) {
+    console.error("Error in saveEmployeeLeave:", error);
+    res.status(500).json({
+      status: "fail",
+      message: error.message,
+    });
+  }
+};
 
 const approvalFlow = async (req, res) => {
   try {
@@ -148,205 +164,237 @@ const approvalFlow = async (req, res) => {
 
     if (!leave) {
       return res.status(404).json({
-        status: 'fail',
-        message: 'Leave not found',
+        status: "fail",
+        message: "Leave not found",
       });
     }
 
-    const user = await User.findOne({empNo:leave.empNo})
+    const employee = await User.findOne({ empNo: leave.empNo });
+
+    if (!employee) {
+      return res.status(404).json({
+        status: "success",
+        message: "Employee not found",
+      });
+    }
+
+    // Map leaveType to ApprovalFlow.typeName
+    const typeName = typeMap[leave.leaveType];
+    if (!typeName) {
+      return res
+        .status(400)
+        .json({
+          status: "fail",
+          message: `Approval mapping not found for leave type: ${leave.leaveType}`,
+        });
+    }
+
+    const approvalFlow = await Approval.findOne({ typeName });
+    console.log(approvalFlow);
+    if (!approvalFlow) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Approval flow not found" });
+    }
+
+    const stepperData = await getApprovalStepEmployees(
+      employee.empNo,
+      approvalFlow.listApprovalFlowDetails,
+      leave.approvalStatus,
+      employee.role
+    );
 
     // You can send back relevant info about the approval flow:
     res.status(200).json({
-      status: 'success',
+      status: "success",
+      message: "Record(s) Fetched Successfully!",
       data: {
-        empNo: leave.empNo,
-        name: leave.name,
-        reasonComment: leave.reasonComment,
-        createAt: leave.createAt,
-        leaveStatus: leave.status,
-        approverComment: leave.approverComment,
-        updatedBy: leave.updatedBy,
-        updateAt: leave.updateAt,
-        appliedBy: leave.appliedBy || `${leave.empNo} - ${leave.name}`,
-        tlApprover: user.teamLeader,
-        managerApprover: user.manager,
-        hrApprover: user.hr,
+        // leave,
+        stepperData,
+        // empNo: leave.empNo,
+        // name: leave.name,
+        // reasonComment: leave.reasonComment,
+        // createAt: leave.createAt,
+        // leaveStatus: leave.status,
+        // approverComment: leave.approverComment,
+        // updatedBy: leave.updatedBy,
+        // updateAt: leave.updateAt,
+        // appliedBy: leave.appliedBy || `${leave.empNo} - ${leave.name}`,
+        // tlApprover: user.teamLeader,
+        // managerApprover: user.manager,
+        // hrApprover: user.hr,
       },
     });
   } catch (error) {
+    console.log(error);
     res.status(500).json({
-      status: 'fail',
+      status: "fail",
       message: error.message,
     });
   }
 };
 
-
 const LeaveRequestList = async (req, res) => {
   try {
-    const { empNo, role } = req.body;
+    const { approverEmpNo } = req.body;
 
-    if (!empNo || !role) {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'empNo and role are required'
-      });
-    }
-
-   // Map actual role to expected status
-    const roleStatusMap = {
-      'Team Leader': 'Pending for Team Leader',
-      'Manager': 'Pending for Manager',
-      'HR': 'Pending for HR',
-    };
-
-    const expectedStatus = roleStatusMap[role];
-
-    if (!expectedStatus) {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'Invalid role provided'
-      });
-    }
-
-    const leaveRequests = await Leave.find({
-      status: expectedStatus
+    const leaves = await Leave.find({
+      approvalStatus: {
+        $elemMatch: {
+          empNo: approverEmpNo,
+          status: "Pending"
+        }
+      }
     }).sort({ createAt: -1 });
 
     res.status(200).json({
       status: "success",
-      message: "Leave requests fetched successfully!",
+      message: "Record(s) Fetched Successfully!",
       data: {
-        records: leaveRequests.length,
-        leaveRequests
+        leaves,
+        totalRecords: leaves.length,
       },
     });
 
   } catch (error) {
     res.status(500).json({
-      status: 'fail',
+      status: "fail",
       message: error.message,
     });
   }
 };
+
 
 
 const approveRejectLeave = async (req, res) => {
   try {
-    const { leaveId, action, role, approverComment, updatedBy } = req.body;
+    const { leaveId, action, comments, approverEmpNo } = req.body;
 
     const leave = await Leave.findById(leaveId);
-
     if (!leave) {
-      return res.status(404).json({
-        status: 'fail',
-        message: 'Leave not found',
-      });
+      return res.status(404).json({ status: 'fail', message: 'Leave not found' });
     }
 
-    // const expectedStatus = {
-    //   TL: 'Pending for TL',
-    //   Manager: 'Pending for Manager',
-    //   HR: 'Pending for HR',
-    // };
-
-    const roleStatusMap = {
-      'Team Leader': 'Pending for Team Leader',
-      'Manager': 'Pending for Manager',
-      'HR': 'Pending for HR',
-    };
-
-    const expectedStatus = roleStatusMap[role];
-
-    if (leave.status !== expectedStatus) {
-      return res.status(400).json({
-        status: 'fail',
-        message: `Leave not pending with ${role}`,
-      });
+    const approver = await User.findOne({ empNo: approverEmpNo });
+    if (!approver) {
+      return res.status(404).json({ status: 'fail', message: 'Approver not found' });
     }
 
-    let newStatus = '';
-    if (action === 'Approved') {
-      newStatus =
-        role === 'Team Leader' ? 'Pending for Manager' :
-        role === 'Manager' ? 'Pending for HR' :
-        'Final Approved';
+    const { role } = approver;
 
-    } else if (action === 'Rejected') {
-      newStatus = `Rejected by ${role}`;
+    const alreadyActed = leave.approvalStatus.find(
+      (step) => step.empNo === approverEmpNo && step.role === role && step.status !== 'Pending'
+    );
 
+    if (alreadyActed) {
+      return res.status(400).json({ status: 'fail', message: 'You have already taken action' });
+    }
+
+    // Remove old pending entry
+    leave.approvalStatus = leave.approvalStatus.filter(
+      (s) => !(s.empNo === approverEmpNo && s.role === role && s.status === 'Pending')
+    );
+
+    // Add current approver action
+    leave.approvalStatus.push({
+      role,
+      empNo: approverEmpNo,
+      name: `${approver.firstName} ${approver.lastName}`,
+      status: action === 'Approved' ? 'Approved' : 'Rejected',
+      comments,
+      actionDate: new Date(),
+    });
+
+    const typeName = typeMap[leave.leaveType];
+    const approvalFlow = await Approval.findOne({ typeName });
+    const flowSteps = approvalFlow?.listApprovalFlowDetails || [];
+
+    // Get stepper
+    const stepperData = await getApprovalStepEmployees(
+      leave.empNo,
+      flowSteps,
+      leave.approvalStatus,
+      approver.role
+    );
+
+    // Find next pending approver
+    const nextPending = stepperData.find((step) => step.status === 'Pending');
+
+    if (action === 'Rejected') {
+      leave.status = `Rejected by ${role}`;
+    } else if (!nextPending) {
+      leave.status = 'Approved';
     } else {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'Invalid action',
-      });
+      // Check if already exists in approvalStatus
+      const alreadyExists = leave.approvalStatus.some(
+        (s) => s.empNo === nextPending.empNo && s.role === nextPending.role
+      );
+
+      if (!alreadyExists) {
+        leave.approvalStatus.push({
+          role: nextPending.role,
+          empNo: nextPending.empNo,
+          name: nextPending.name.split(' - ')[0], // clean name
+          status: 'Pending',
+          comments: null,
+          actionDate: null,
+        });
+      }
+
+      leave.status = `Pending for ${nextPending.role}`;
     }
 
-    leave.status = newStatus;
-    leave.approverComment = approverComment;
-    leave.updatedBy = updatedBy;
+    leave.updatedBy = approverEmpNo;
     leave.updateAt = new Date();
 
-    await leave.save();
+    const updatedLeave = await leave.save();
 
     res.status(200).json({
       status: 'success',
-      message: `Leave ${action}d by ${role}`,
-      data: {
-        leave,
-      },
+      message: `Leave ${action}ed successfully`,
+      data: updatedLeave,
     });
 
   } catch (error) {
-    res.status(500).json({
-      status: 'fail',
-      message: error.message,
-    });
+    console.error("Error in approveRejectLeave:", error);
+    res.status(500).json({ status: 'fail', message: error.message });
   }
 };
-
-
 
 const getAllLeaves = async (req, res) => {
   try {
-    const { empNo } = req.body;
+    const { empNo, status, fromDate, toDate } = req.body;
 
-    const page = parseInt(req.body.page) || 1;
-    const limit = parseInt(req.body.limit) || 10;
-    const skip = (page - 1) * limit;
+    let query = {};
 
+    if (empNo) query.empNo = empNo;
+    if (status) query.status = status;
+    if (fromDate && toDate) {
+      query.fromDate = { $gte: new Date(fromDate) };
+      query.toDate = { $lte: new Date(toDate) };
+    }
 
-    const leaves = await Leave.find({empNo: empNo})
-      .skip(skip)
-      .limit(limit)
-      .sort({
-        date: -1,
-      });
-
-    const total = await Leave.countDocuments({empNo: empNo});
-
+    const leaves = await Leave.find(query).sort({ createAt: -1 });
 
     res.status(200).json({
       status: "success",
-      message: "Record(s) Successfully Fetched!",
-
+      message: "Record(s) Fetched Successfully!",
       data: {
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
-        totalRecords: leaves.length,
         leaves,
+        totalRecords: leaves.length,
       },
     });
-
   } catch (error) {
-
-    res.status(500).json({ 
-        status: 'fail', 
-        message: error.message 
-    });
+    res.status(500).json({ status: "fail", message: error.message });
   }
 };
 
 
-
-export { GetUpcomingHolidays, saveEmployeeLeave, approvalFlow, LeaveRequestList, approveRejectLeave, getAllLeaves }
+export {
+  GetUpcomingHolidays,
+  saveEmployeeLeave,
+  approvalFlow,
+  LeaveRequestList,
+  approveRejectLeave,
+  getAllLeaves,
+};

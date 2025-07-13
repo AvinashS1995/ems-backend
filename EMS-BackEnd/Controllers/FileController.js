@@ -82,7 +82,7 @@ const getAllFiles = async (req, res) => {
       if (toDate) filter.uploadedAt.$lte = toDate;
     }
 
-    const files = await File.find(filter).sort({ uploadedAt: -1 }).lean();
+    const files = await File.find(filter).sort({ uploadedAt: -1 }).select('-__v').lean();
 
     res.status(200).json({
       status: "success",

@@ -1,5 +1,5 @@
 import express from 'express';
-import { approvalFlow, approveRejectLeave, getAllLeaves, GetUpcomingHolidays, LeaveRequestList, saveEmployeeLeave } from "../Controllers/LeaveController.js";
+import { approvalFlow, approveRejectLeave, getAllLeaves, getPendingLeaveRequestsForApprover, GetUpcomingHolidays, LeaveRequestList, saveEmployeeLeave, viewLeaveRequestDetails } from "../Controllers/LeaveController.js";
 import { authenticateToken } from '../Middlewares/verifyTokenMiddleware.js';
 
 
@@ -170,6 +170,55 @@ router.post('/application-approval-flow', authenticateToken, approvalFlow)
  *         description: Server error
  */
 router.get('/get-upcoming-holidays', GetUpcomingHolidays)
-
+/**
+ * @swagger
+ * /api/leave/view-leave-request-details:
+ *   post:
+ *     summary: Employee Leave Approval Flow
+ *     tags:
+ *       - Leave
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               leaveId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Employee Leave Application Approval Flow successfully !
+ *       400:
+ *         description: Bad request or missing required fields
+ *       500:
+ *         description: Server error
+ */
+router.post('/view-leave-request-details', viewLeaveRequestDetails)
+/**
+ * @swagger
+ * /api/leave/view-leave-request-details:
+ *   post:
+ *     summary: Employee Leave Approval Flow
+ *     tags:
+ *       - Leave
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               leaveId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Employee Leave Application Approval Flow successfully !
+ *       400:
+ *         description: Bad request or missing required fields
+ *       500:
+ *         description: Server error
+ */
+router.post('/get-leave-request-approver', getPendingLeaveRequestsForApprover)
 
 export default router;

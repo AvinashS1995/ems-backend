@@ -4,9 +4,24 @@ const userSchema = new mongoose.Schema({
     empNo: {
         type: String,
     },
-    name: {
+    firstName: {
         type: String,
-        required: [true, 'Name is required field']
+        required: [true, 'First Name is required field']
+    },
+    middleName: {
+        type: String,
+    },
+    lastName: {
+        type: String,
+        required: [true, 'Last Name is required field']
+    },
+    dob: {
+        type: String,
+        required: [true, 'Date Of Birth is required field']
+    },
+    gender: {
+        type: String,
+        required: [true, 'Gender is required field']
     },
     email: {
         type: String,
@@ -17,6 +32,10 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Mobile is required field'],
         unique: true
+    },
+    address: {
+        type: String,
+        required: [true, 'Address is required field'],
     },
     password: {
         type: String,
@@ -34,21 +53,17 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Status is requied field']
     },
-    teamLeader: {
+    reportedBy: {
         type: String,
-        required: [true, 'Team Leader is requied field']
-    },
-    manager: {
-        type: String,
-        required: [true, 'Manager is requied field']
-    },
-    hr: {
-        type: String,
-        required: [true, 'HR is requied field']
+        required: [true, 'Reported By is requied field']
     },
     designation: {
         type: String,
         required: [true, 'Designation is requied field']
+    },
+    department: {
+        type: String,
+        required: [true, 'Department is requied field']
     },
     joiningDate: {
         type: String,
@@ -81,7 +96,7 @@ const userReportingSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  reportedBy: {
+  reportedByEmployee: {
     type: String,
     required: true,
   },
@@ -107,6 +122,9 @@ const typeSchema = new mongoose.Schema({
         type: Number,
         required: [true, 'Type Value is required field'],
         // unique: true
+    },
+     departmentType: {
+        type: String,
     },
     description: {
         type: String,

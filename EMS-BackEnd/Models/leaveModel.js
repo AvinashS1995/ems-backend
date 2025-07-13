@@ -45,6 +45,16 @@ const leaveSchema = new mongoose.Schema({
   updatedBy: {
     type: String,
   },
+   approvalStatus: [
+    {
+      role: String,
+      empNo: String,
+      name: String,
+      status: String, // Pending, Approved, Submitted, Rejected
+      comments: String,
+      actionDate: String
+    }
+  ],
   updateAt: {
     type: Date,
     default: Date.now,

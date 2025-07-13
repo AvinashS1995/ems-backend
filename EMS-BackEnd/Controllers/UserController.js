@@ -1,20 +1,25 @@
 import { ConnectToDatabase } from "../db/db.js";
-import { Type, User } from "../Models/UserModel.js";
+import { Type, User, UserReporting } from "../Models/UserModel.js";
 import bcrypt from "bcrypt";
 import { getPresignedUrl } from "../storage/s3.config.js";
+import { extractEmpNo, generateEmpNo } from "../common/employee.utilis.js";
 
 const CreateUser = async (req, res) => {
   try {
     const {
-      name,
+      firstName,
+      middleName,
+      lastName,
+      dob,
+      gender,
       email,
+      address,
+      department,
       role,
       mobile,
       status,
       type,
-      teamLeader,
-      manager,
-      hr,
+      reportedBy,
       designation,
       joiningDate,
       salary,
@@ -23,7 +28,6 @@ const CreateUser = async (req, res) => {
     } = req.body;
 
     if (
-      !name ||
       !email ||
       !role ||
       !status ||
@@ -47,41 +51,59 @@ const CreateUser = async (req, res) => {
       });
     }
 
-    // Find the last inserted employee sorted by empNo
-    const lastEmp = await User.findOne()
-      .sort({ empNo: -1 })
-      .collation({ locale: "en_US", numericOrdering: true });
+    // // Find the last inserted employee sorted by empNo
+    // const lastEmp = await User.findOne()
+    //   .sort({ empNo: -1 })
+    //   .collation({ locale: "en_US", numericOrdering: true });
 
-    let empNo = "EMP001";
+    // let empNo = "EMP001";
 
-    if (lastEmp && lastEmp.empNo) {
-      const lastNumber = parseInt(lastEmp.empNo.replace("EMP", ""));
-      const newNumber = lastNumber + 1;
-      empNo = `EMP${String(newNumber).padStart(3, "0")}`;
-    }
+    // if (lastEmp && lastEmp.empNo) {
+    //   const lastNumber = parseInt(lastEmp.empNo.replace("EMP", ""));
+    //   const newNumber = lastNumber + 1;
+    //   empNo = `EMP${String(newNumber).padStart(3, "0")}`;
+    // }
+    
+    const empNo = await generateEmpNo(User);
 
     const password = "Admin@1234";
     const hashPassword = await bcrypt.hash(password, 10);
 
     const newUser = new User({
       empNo,
-      name,
+      firstName,
+      middleName,
+      lastName,
+      dob,
+      gender,
       email,
+      address,
       password: hashPassword,
       role,
       mobile,
       status,
       type,
-      teamLeader,
-      manager,
-      hr,
+      reportedBy,
       designation,
+      department,
       joiningDate,
       salary,
       workType,
     });
 
     await newUser.save();
+
+    // Save to ReportedEmployee
+    const reportedByEmpID = extractEmpNo(reportedBy); // EMP0056
+
+    if (reportedByEmpID) {
+ await UserReporting.create({
+      employee: empNo,
+      reportedByEmployee: reportedByEmpID,
+    });
+    }
+   
+
     res.status(201).json({
       status: "success",
       message: "User created successfully",
@@ -167,16 +189,20 @@ const UpdateEmployeeList = async (req, res) => {
   try {
     const {
       id,
-      name,
+      firstName,
+      middleName,
+      lastName,
+      dob,
+      gender,
+      address,
       email,
       mobile,
       role,
       status,
       type,
-      teamLeader,
-      manager,
-      hr,
+      reportedBy,
       designation,
+      department,
       joiningDate,
       salary,
       workType,
@@ -193,21 +219,36 @@ const UpdateEmployeeList = async (req, res) => {
       });
     }
 
-    existingType.name = name;
+    existingType.firstName = firstName;
+    existingType.middleName = middleName;
+    existingType.lastName = lastName;
+    existingType.dob = dob;
+    existingType.gender = gender;
+    existingType.address = address;
     existingType.email = email;
     existingType.mobile = mobile;
     existingType.role = role;
     existingType.status = status;
-    existingType.teamLeader = teamLeader;
-    existingType.manager = manager;
-    existingType.hr = hr;
+    existingType.reportedBy = reportedBy;
     existingType.designation = designation;
+    existingType.department = department;
     existingType.joiningDate = joiningDate;
     existingType.salary = salary;
     existingType.workType = workType;
     existingType.profileImage = profileImage;
 
     await existingType.save();
+
+    // Update UserReporting if `reportedBy` changed
+    if (reportedBy !== existingType.reportedBy) {
+      const empNo = existingType.empNo;
+      const newReportedByEmpID = extractEmpNo(reportedBy);
+      await UserReporting.findOneAndUpdate(
+        { employee: empNo },
+        { reportedByEmployee: newReportedByEmpID },
+        { upsert: true }
+      );
+    }
 
     res.status(200).json({
       status: "success",
@@ -254,7 +295,7 @@ const DeleteEmployeeList = async (req, res) => {
 
 const CreateTypeList = async (req, res) => {
   try {
-    const { entityValue, typeLabel, description } = req.body;
+    const { entityValue, typeLabel, departmentType, description } = req.body;
 
     const labelExists = await Type.findOne({ typeLabel });
 
@@ -275,6 +316,7 @@ const CreateTypeList = async (req, res) => {
       entityValue,
       typeLabel,
       typeValue: newTypeValue,
+      departmentType,
       description,
     });
 
@@ -300,7 +342,7 @@ const CreateTypeList = async (req, res) => {
 
 const GetTypeList = async (req, res) => {
   try {
-    const { entityValue, typeLabel } = req.body;
+    const { entityValue, typeLabel, departmentType } = req.body;
 
     // const query = entityValue ? { entityValue } : {};
 
@@ -314,8 +356,12 @@ const GetTypeList = async (req, res) => {
       query.typeLabel = typeLabel;
     }
 
+    if (departmentType) {
+      query.typeLabel = departmentType;
+    }
+
     const types = await Type.find(query).select(
-      "_id entityValue typeLabel typeValue description"
+      "_id entityValue typeLabel typeValue departmentType description"
     );
 
     res.status(200).json({
@@ -335,7 +381,7 @@ const GetTypeList = async (req, res) => {
 
 const UpdateTypeList = async (req, res) => {
   try {
-    const { id, entityValue, typeLabel, description } = req.body;
+    const { id, entityValue, typeLabel, departmentType, description } = req.body;
 
     const existingType = await Type.findById(id);
     // console.log(existingType);
@@ -349,6 +395,7 @@ const UpdateTypeList = async (req, res) => {
 
     existingType.entityValue = entityValue;
     existingType.typeLabel = typeLabel;
+    existingType.departmentType = departmentType;
     existingType.description = description;
     existingType.updateAt = new Date();
 
