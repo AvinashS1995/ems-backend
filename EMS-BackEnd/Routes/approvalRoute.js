@@ -1,5 +1,5 @@
 import express from 'express';
-import { deleteApprovalDetails, getAllApprovalDetails, saveApprovalDetails, updateApprovalDetails } from '../Controllers/ApprovalController.js';
+import { deleteApprovalDetails, getAllApprovalDetails, getEmpApprovalList, saveApprovalDetails, updateApprovalDetails } from '../Controllers/ApprovalController.js';
 
 
 const router = express.Router();
@@ -130,5 +130,30 @@ router.post('/update-approval-configuration-detail', updateApprovalDetails)
  *         description: Server error
  */
 router.post('/delete-approval-configuration-detail', deleteApprovalDetails)
+/**
+ * @swagger
+ * /api/approval/get-employee-approval-request-list:
+ *   post:
+ *     summary: Get All Employee Approval Request List
+ *     tags:
+  *       - Approval
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               approverEmpNo:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Record(s) Fetched successfully
+ *       400:
+ *         description: Bad request or missing required fields
+ *       500:
+ *         description: Server error
+ */
+router.post('/get-employee-approval-request-list', getEmpApprovalList)
 
 export default router;

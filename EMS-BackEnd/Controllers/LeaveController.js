@@ -1,19 +1,19 @@
 import { getApprovalStepEmployees } from "../common/employee.utilis.js";
-import { Approval } from "../Models/approvalSchema.js";
+import { Approval } from "../Models/approvalModel.js";
 import { Holidays } from "../Models/holidayModel.js";
 import { Leave } from "../Models/leaveModel.js";
 import { User } from "../Models/UserModel.js";
 
 const typeMap = {
-  "Paid Leaves (PL)": "Leave Request",
-  "Sick Leave (SL)": "Leave Request",
-  "Casual Leave (CL)": "Leave Request",
-  "Maternity Leave (ML)": "Leave Request", // ✅ Fixed
-  "Paternity Leave (PTL)": "Leave Request",
-  "Bereavement Leave (BL)": "Leave Request",
-  "Compensatory Off": "Leave Request",
-  "Marriage Leave (MRL)": "Leave Request",
-  "Leave Without Pay (LWP)": "Leave Request",
+  "Paid Leaves (PL)": "Leave",
+  "Sick Leave (SL)": "Leave",
+  "Casual Leave (CL)": "Leave",
+  "Maternity Leave (ML)": "Leave",
+  "Paternity Leave (PTL)": "Leave",
+  "Bereavement Leave (BL)": "Leave",
+  "Compensatory Off": "Leave",
+  "Marriage Leave (MRL)": "Leave",
+  "Leave Without Pay (LWP)": "Leave",
 };
 
 const GetUpcomingHolidays = async (req, res) => {
@@ -209,20 +209,7 @@ const approvalFlow = async (req, res) => {
       status: "success",
       message: "Record(s) Fetched Successfully!",
       data: {
-        // leave,
         stepperData,
-        // empNo: leave.empNo,
-        // name: leave.name,
-        // reasonComment: leave.reasonComment,
-        // createAt: leave.createAt,
-        // leaveStatus: leave.status,
-        // approverComment: leave.approverComment,
-        // updatedBy: leave.updatedBy,
-        // updateAt: leave.updateAt,
-        // appliedBy: leave.appliedBy || `${leave.empNo} - ${leave.name}`,
-        // tlApprover: user.teamLeader,
-        // managerApprover: user.manager,
-        // hrApprover: user.hr,
       },
     });
   } catch (error) {

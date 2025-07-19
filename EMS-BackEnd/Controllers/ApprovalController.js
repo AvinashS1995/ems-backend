@@ -1,4 +1,5 @@
-import { Approval } from "../Models/approvalSchema.js";
+import { Approval } from "../Models/approvalModel.js";
+import mongoose from "mongoose";
 
 const saveApprovalDetails = async (req, res) => {
   try {
@@ -60,9 +61,7 @@ const getAllApprovalDetails = async (req, res) => {
 };
 
 const updateApprovalDetails = async (req, res) => {
-
   try {
-
     const { id, type, typeName, listApprovalFlowDetails } = req.body;
 
     const updatedApproval = await Approval.findByIdAndUpdate(
@@ -76,9 +75,9 @@ const updateApprovalDetails = async (req, res) => {
     );
 
     if (!updatedApproval) {
-      return res.status(404).json({ 
-        status: "fail", 
-        message: "Approval config not found." 
+      return res.status(404).json({
+        status: "fail",
+        message: "Approval config not found.",
       });
     }
 
@@ -86,14 +85,13 @@ const updateApprovalDetails = async (req, res) => {
       status: "success",
       message: "Approval Flow Updated Successfully",
       data: {
-        updatedApproval
+        updatedApproval,
       },
     });
-
   } catch (err) {
-    res.status(500).json({ 
-      status: "fail", 
-      message: err.message 
+    res.status(500).json({
+      status: "fail",
+      message: err.message,
     });
   }
 };
@@ -105,9 +103,9 @@ const deleteApprovalDetails = async (req, res) => {
     const deletedApproval = await Approval.findByIdAndDelete(id);
 
     if (!deletedApproval) {
-      return res.status(404).json({ 
-        status: "fail", 
-        message: "Approval config not found." 
+      return res.status(404).json({
+        status: "fail",
+        message: "Approval config not found.",
       });
     }
 
@@ -115,13 +113,77 @@ const deleteApprovalDetails = async (req, res) => {
       status: "success",
       message: "Approval Flow Deleted Successfully",
     });
-
   } catch (err) {
-    res.status(500).json({ 
-      status: "fail", 
-      message: err.message 
+    res.status(500).json({
+      status: "fail",
+      message: err.message,
     });
   }
 };
 
-export { saveApprovalDetails, getAllApprovalDetails, updateApprovalDetails, deleteApprovalDetails};
+const getEmpApprovalList = async (req, res) => {
+  try {
+    const { approverEmpNo } = req.body;
+
+    if (!approverEmpNo) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Approver empNo is required",
+      });
+    }
+
+    const approvals = await Approval.find({}).lean();
+    const approvalList = [];
+
+    for (const approval of approvals) {
+      const { type, typeName } = approval;
+
+      let count = 0;
+
+      try {
+        const Model = mongoose.model(typeName);
+
+        count = await Model.countDocuments({
+          approvalStatus: {
+            $elemMatch: {
+              empNo: approverEmpNo,
+              status: "Pending",
+            },
+          },
+        });
+      } catch (err) {
+        console.warn(`Model not found for typeName: ${typeName}`);
+      }
+      if (count > 0) {
+        approvalList.push({
+          applicationType: type,
+          applicationTypeName: typeName,
+          typeCount: count,
+        });
+      }
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Record(s) Fetched Successfully!",
+      totalRecords: approvalList.length,
+      data: {
+        approvalList
+      },
+    });
+  } catch (error) {
+    console.error("Error in getEmpApprovalList:", error);
+    res.status(500).json({
+      status: "fail",
+      message: error.message,
+    });
+  }
+};
+
+export {
+  saveApprovalDetails,
+  getAllApprovalDetails,
+  updateApprovalDetails,
+  deleteApprovalDetails,
+  getEmpApprovalList,
+};
