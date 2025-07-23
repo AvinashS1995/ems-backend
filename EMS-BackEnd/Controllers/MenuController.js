@@ -123,6 +123,83 @@ const GetMenu = async (req, res) => {
   }
 };
 
+// Update Menu API
+const UpdateMenu = async (req, res) => {
+  try {
+    const { menuId, parentId, ...updateData } = req.body;
+
+    if (!menuId) {
+      return res.status(400).json({
+        status: "fail",
+        message: "menuId is required to update the menu",
+      });
+    }
+
+    if (!parentId) {
+      // It's a parent menu
+      const updatedMenu = await Menu.findByIdAndUpdate(
+        menuId,
+        { ...updateData, updateAt: Date.now() },
+        { new: true }
+      );
+
+      if (!updatedMenu) {
+        return res.status(404).json({
+          status: "fail",
+          message: "Parent menu not found",
+        });
+      }
+
+      return res.status(200).json({
+        status: "success",
+        message: "Parent menu updated successfully",
+        updatedMenu,
+      });
+
+    } else {
+      // It's a child menu
+      const parentMenu = await Menu.findById(parentId);
+      if (!parentMenu) {
+        return res.status(404).json({
+          status: "fail",
+          message: "Parent menu not found",
+        });
+      }
+
+      // Find the child menu to update
+      const childIndex = parentMenu.childMenu.findIndex(
+        (child) => child._id.toString() === menuId
+      );
+
+      if (childIndex === -1) {
+        return res.status(404).json({
+          status: "fail",
+          message: "Child menu not found in parent",
+        });
+      }
+
+      // Update child menu fields
+      Object.keys(updateData).forEach((key) => {
+        parentMenu.childMenu[childIndex][key] = updateData[key];
+      });
+
+      // Save updated parent
+      await parentMenu.save();
+
+      return res.status(200).json({
+        status: "success",
+        message: "Child menu updated successfully",
+        updatedChildMenu: parentMenu.childMenu[childIndex],
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: "fail",
+      message: error.message,
+    });
+  }
+};
+
 
 // Assign menus to a role
 const AssignRoleMenus = async (req, res) => {
@@ -222,4 +299,4 @@ const GetRoleMenus = async (req, res) => {
 };
 
 
-export { CreateMenu, GetMenu, AssignRoleMenus, GetRoleMenus };
+export { CreateMenu, GetMenu, UpdateMenu, AssignRoleMenus, GetRoleMenus };

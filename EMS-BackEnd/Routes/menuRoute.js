@@ -1,5 +1,5 @@
 import express from 'express';
-import { AssignRoleMenus, CreateMenu, GetMenu, GetRoleMenus  } from '../Controllers/MenuController.js';
+import { AssignRoleMenus, CreateMenu, GetMenu, GetRoleMenus, UpdateMenu  } from '../Controllers/MenuController.js';
 import { authenticateToken } from '../Middlewares/verifyTokenMiddleware.js';
 
 
@@ -56,6 +56,49 @@ router.post('/create-menu', authenticateToken, CreateMenu)
  *         description: Server error
  */
 router.post('/getmenu', authenticateToken, GetMenu)
+/**
+ * @swagger
+ * /api/menu/update-menu:
+ *   post:
+ *     summary: Update existing menu (parent or child)
+ *     tags:
+ *       - Menu
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - menuId
+ *             properties:
+ *               menuId:
+ *                 type: string
+ *               parentId:
+ *                 type: string
+ *                 description: Required only if updating a child menu
+ *               title:
+ *                 type: string
+ *               path:
+ *                 type: string
+ *               componentName:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               icon:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Menu updated successfully
+ *       400:
+ *         description: Invalid request
+ *       404:
+ *         description: Menu not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/update-menu', authenticateToken, UpdateMenu)
+
 /**
  * @swagger
  * /api/menu/create-role-wise-menu:

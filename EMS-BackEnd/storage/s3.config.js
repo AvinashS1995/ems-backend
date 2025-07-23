@@ -7,7 +7,7 @@ dotenv.config({path:'./.env'});
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION,
-  endpoint: 'https://s3.filebase.com',
+  endpoint: process.env.AWS_ENDPOINT,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -37,7 +37,9 @@ const uploadToFilebase = async (file) => {
 
   await s3Client.send(new PutObjectCommand(uploadParams));
 
-  const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.filebase.com/${fileKey}`;
+  // const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.filebase.com/${fileKey}`;
+
+  const fileUrl = `https://s3.filebase.com/${process.env.AWS_BUCKET_NAME}/${fileKey}`;
 
   return { fileKey, fileUrl };
 };
