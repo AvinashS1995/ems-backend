@@ -1,6 +1,6 @@
 
 import express from 'express';
-import { savePopupDetails } from '../Controllers/PopupController.js';
+import { deletePopupDetails, getAllPopupDetails, getEmployeePopupDetails, savePopupDetails, updatePopupDetails } from '../Controllers/PopupController.js';
 
 const router = express.Router();
 
@@ -8,9 +8,8 @@ const router = express.Router();
  * @swagger
  * /api/popup/save-popup-details:
  *   post:
- *     summary: Save New Pop Up Details
- *     tags:
- *       - Popup
+ *     summary: Save new popup details
+ *     tags: [Popup]
  *     requestBody:
  *       required: true
  *       content:
@@ -18,7 +17,7 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             properties:
-  *               name:
+ *               name:
  *                 type: string
  *               startDate:
  *                 type: string
@@ -35,22 +34,148 @@ const router = express.Router();
  *               gender:
  *                 type: string
  *               employee:
- *                 type: string
+ *                 type: array
+ *                 items:
+ *                   type: string
  *               popupType:
  *                 type: string
+ *                 enum: [text, file]
  *               textMessage:
+ *                 type: string
+ *               uploadedFile:
  *                 type: string
  *               isActive:
  *                 type: boolean
- *               uploadedFile:
- *                 type: string
  *     responses:
  *       201:
- *         description: Pop Details created successfully
+ *         description: Popup created successfully
  *       400:
- *         description: Bad request or missing required fields
+ *         description: Missing required fields
  *       500:
- *         description: Server error
+ *         description: Internal server error
  */
+router.post("/save-popup-details", savePopupDetails);
 
-router.post("/save-popup-details", upload.single("uploadedFile"), savePopupDetails);
+/**
+ * @swagger
+ * /api/popup/get-employee-popup:
+ *   post:
+ *     summary: Get popups for a specific employee
+ *     tags: [Popup]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               employee:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Popup list returned
+ *       400:
+ *         description: Missing employee ID
+ *       500:
+ *         description: Internal server error
+ */
+router.post("/get-employee-popup", getEmployeePopupDetails);
+
+/**
+ * @swagger
+ * /api/popup/get-all-popup:
+ *   post:
+ *     summary: Get all popup details
+ *     tags: [Popup]
+ *     responses:
+ *       200:
+ *         description: All popups retrieved
+ *       500:
+ *         description: Internal server error
+ */
+router.post("/get-all-popup", getAllPopupDetails);
+
+/**
+ * @swagger
+ * /api/popup/update-popup-details:
+ *   post:
+ *     summary: Update popup details
+ *     tags: [Popup]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               startDate:
+ *                 type: string
+ *               endDate:
+ *                 type: string
+ *               startTime:
+ *                 type: string
+ *               endTime:
+ *                 type: string
+ *               country:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *               gender:
+ *                 type: string
+ *               employee:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               popupType:
+ *                 type: string
+ *                 enum: [text, file]
+ *               textMessage:
+ *                 type: string
+ *               uploadedFile:
+ *                 type: string
+ *               isActive:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Popup updated successfully
+ *       400:
+ *         description: Popup ID is required
+ *       404:
+ *         description: Popup not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post("/update-popup-details", updatePopupDetails);
+
+/**
+ * @swagger
+ * /api/popup/delete-popup-details:
+ *   post:
+ *     summary: Delete popup details
+ *     tags: [Popup]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Popup deleted successfully
+ *       400:
+ *         description: Popup ID is required
+ *       404:
+ *         description: Popup not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post("/delete-popup-details", deletePopupDetails);
+
+export default router;

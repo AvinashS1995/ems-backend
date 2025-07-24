@@ -8,6 +8,7 @@ import attendenceRoute from './Routes/attendenceRoute.js';
 import leaveRoute from './Routes/leaveRoute.js';
 import fileRoute from './Routes/fileRoute.js';
 import approvalRoute from './Routes/approvalRoute.js';
+import popupRoute from './Routes/popupRoute.js';
 import { ConnectToDatabase } from './db/db.js';
 import setupSwagger from './swagger/swagger.js';
 import startCron from './crons/cronRun.js';
@@ -30,6 +31,7 @@ app.use('/api/attendence', attendenceRoute)
 app.use('/api/leave', leaveRoute)
 app.use('/api/file', fileRoute);
 app.use('/api/approval', approvalRoute);
+app.use('/api/popup', popupRoute);
 
 
 setupSwagger(app);
