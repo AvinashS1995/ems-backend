@@ -231,7 +231,7 @@ const verifyCheckInsOtp = async (req, res) => {
       // New attendance record
       attendance = new Attendance({
         email,
-        name: user.name,
+        name: `${user.firstName} ${user.lastName}`,
         designation: user.designation,
         employmentType: user.workType,
         date: today,
@@ -249,6 +249,7 @@ const verifyCheckInsOtp = async (req, res) => {
       checkInTime: currentTime.format("HH:mm:ss"),
     });
   } catch (err) {
+    console.log(err)
     res.status(500).json({
       status: "fail",
       message: "Something went wrong",

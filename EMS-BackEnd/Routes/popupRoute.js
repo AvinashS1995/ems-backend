@@ -1,6 +1,6 @@
 
 import express from 'express';
-import { deletePopupDetails, getAllPopupDetails, getEmployeePopupDetails, savePopupDetails, updatePopupDetails } from '../Controllers/PopupController.js';
+import { deletePopupDetails, getAllPopupDetails, getEmployeePopupDetails, savePopupDetails, togglePopupStatus, updatePopupDetails } from '../Controllers/PopupController.js';
 
 const router = express.Router();
 
@@ -87,6 +87,23 @@ router.post("/get-employee-popup", getEmployeePopupDetails);
  *   post:
  *     summary: Get all popup details
  *     tags: [Popup]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               startDate:
+ *                 type: string
+ *               endDate:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *               isActive:
+ *                 type: boolean
+ *               popupType:
+ *                 type: string
  *     responses:
  *       200:
  *         description: All popups retrieved
@@ -177,5 +194,31 @@ router.post("/update-popup-details", updatePopupDetails);
  *         description: Internal server error
  */
 router.post("/delete-popup-details", deletePopupDetails);
+/**
+ * @swagger
+ * /api/popup/toggle-popup-status:
+ *   post:
+ *     summary: Toggle popup active status
+ *     tags: [Popup]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *                 description: Popup ID
+ *     responses:
+ *       200:
+ *         description: Status updated
+ *       404:
+ *         description: Popup not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post("/toggle-popup-status", togglePopupStatus);
+
 
 export default router;

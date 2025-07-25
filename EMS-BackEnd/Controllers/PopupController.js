@@ -1,12 +1,19 @@
+import { getCurrentMinutes, parseTime } from "../common/timeHelper.js";
 import { Popup } from "../Models/popupModel.js";
+import { getPresignedUrl } from "../storage/s3.config.js";
 
-const cleanPayload = (payload) => {
-  return Object.fromEntries(
-    Object.entries(payload).filter(
-      ([_, val]) => val !== null && val !== undefined && val !== ""
-    )
-  );
+const normalizePayload = (payload) => {
+  const normalized = {};
+  for (const key in payload) {
+    if (payload[key] === undefined || payload[key] === null) {
+      normalized[key] = "";
+    } else {
+      normalized[key] = payload[key];
+    }
+  }
+  return normalized;
 };
+
 
 const savePopupDetails = async (req, res) => {
   try {
@@ -42,8 +49,8 @@ const savePopupDetails = async (req, res) => {
 
     let payload = {
       popupType,
-      textMessage,
-      uploadedFile,
+      textMessage: popupType === "text" ? textMessage : "",
+      uploadedFile: popupType === "file" ? uploadedFile : "",
       name,
       startDate,
       endDate,
@@ -56,7 +63,7 @@ const savePopupDetails = async (req, res) => {
       isActive,
     };
 
-    payload = cleanPayload(payload);
+    payload = normalizePayload(payload);
 
     const newPopupData = new Popup(payload);
 
@@ -88,32 +95,112 @@ const getEmployeePopupDetails = async (req, res) => {
       });
     }
 
-    const popupDetails = await Popup.find({
+    const now = new Date();
+    const currentDate = new Date(now.toISOString().split("T")[0]);
+    const nowMinutes = getCurrentMinutes();
+
+    const popups = await Popup.find({
       employee: employee,
       isActive: true,
+      startDate: { $lte: currentDate },
+      endDate: { $gte: currentDate },
     }).sort({ createdAt: 1 });
 
-    res.status(200).json({
+    const filteredPopups = popups.filter(popup => {
+      const startMinutes = parseTime(popup.startTime);
+      const endMinutes = parseTime(popup.endTime);
+
+      // If popup crosses midnight (start > end)
+      if (startMinutes > endMinutes) {
+        return nowMinutes >= startMinutes || nowMinutes <= endMinutes;
+      }
+
+      // Normal within-day range
+      return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
+    });
+
+    const popupList = await Promise.all(
+      filteredPopups.map(async (filteredPopups) => {
+        if (filteredPopups.uploadedFile) {
+          const fileKey = filteredPopups.uploadedFile; 
+          const presignedUrl = await getPresignedUrl(fileKey, 3600);
+          filteredPopups.uploadedFile = presignedUrl;
+        } else {
+          filteredPopups.uploadedFile = null;
+        }
+        return filteredPopups;
+      })
+    );
+
+    return res.status(200).json({
       status: "success",
       message: "Record(s) Fetched Successfully!",
-      data: popupDetails,
+      data: popupList,
     });
+
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       status: "fail",
       message: error.message,
     });
   }
 };
 
+
+
+
 const getAllPopupDetails = async (req, res) => {
   try {
-    const popupList = await Popup.find().select("-__v");
+
+   const { startDate, endDate, role, isActive, popupType } = req.body;
+
+    const query = {};
+
+    if (startDate && endDate) {
+      query.startDate = { $gte: new Date(startDate) };
+      query.endDate = { $lte: new Date(endDate) };
+    }
+
+    if (role) {
+      query.role = role;
+    }
+
+    if (typeof isActive === 'boolean') {
+      query.isActive = isActive;
+    }
+
+    if (popupType) {
+      query.popupType = popupType;
+    }
+
+    const page = parseInt(req.body.page) || 1;
+    const limit = parseInt(req.body.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const total = await Popup.countDocuments();
+
+    const popup = await Popup.find(query).skip(skip).limit(limit).select("-__v");
+
+    const popupList = await Promise.all(
+      popup.map(async (popup) => {
+        if (popup.uploadedFile) {
+          const fileKey = popup.uploadedFile; 
+          const presignedUrl = await getPresignedUrl(fileKey, 3600);
+          popup.uploadedFile = presignedUrl;
+        } else {
+          popup.uploadedFile = null;
+        }
+        return popup;
+      })
+    );
 
     return res.status(200).json({
       status: "success",
       message: "Popup details fetched successfully",
       data: {
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalRecords: total,
         popupList
       },
     });
@@ -145,38 +232,37 @@ const updatePopupDetails = async (req, res) => {
       isActive,
     } = req.body;
 
-    if (!id) return res.status(400).json({ message: "Popup ID is required" });
+    if (!id) {
+      return res.status(400).json({ 
+      status: "fail",
+      message: "Popup ID is required" 
+    });
+  }
 
-    const updateData = {};
+    const updateData = {
+      name,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      country,
+      role,
+      gender,
+      employee,
+      popupType,
+      textMessage: popupType === "text" ? textMessage : "",
+      uploadedFile: popupType === "file" ? uploadedFile : "",
+      isActive,
+    };
 
-    if (name?.trim()) updateData.name = name;
-    if (startDate) updateData.startDate = startDate;
-    if (endDate) updateData.endDate = endDate;
-    if (startTime) updateData.startTime = startTime;
-    if (endTime) updateData.endTime = endTime;
-    if (country) updateData.country = country;
-    if (role) updateData.role = role;
-    if (gender) updateData.gender = gender;
-    if (Array.isArray(employee) && employee.length > 0)
-      updateData.employee = employee;
+    const finalUpdate = normalizePayload(updateData);
 
-    if (popupType) updateData.popupType = popupType;
-
-    if (popupType === "text" && textMessage?.trim()) {
-      updateData.textMessage = textMessage;
-    }
-
-    if (popupType === "file" && uploadedFile?.trim()) {
-      updateData.uploadedFile = uploadedFile;
-    }
-
-    if (typeof isActive === "boolean") updateData.isActive = isActive;
-
-    const updatedPopup = await Popup.findByIdAndUpdate(id, updateData, {
+    const updatedPopup = await Popup.findByIdAndUpdate(id, finalUpdate, {
       new: true,
     });
 
-    if (!updated) {
+
+    if (!updatedPopup) {
       return res.status(404).json({
         status: "fail",
         message: "Popup not found",
@@ -232,10 +318,48 @@ const deletePopupDetails = async (req, res) => {
   }
 };
 
+ const togglePopupStatus = async (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Popup ID is required",
+      });
+    }
+
+    const popup = await Popup.findById(id);
+    if (!popup) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Popup not found",
+      });
+    }
+
+    // Toggle the status
+    popup.isActive = !popup.isActive;
+    await popup.save();
+
+    return res.status(200).json({
+      status: "success",
+      message: `Popup status updated to ${popup.isActive ? "Active" : "Inactive"}`,
+      data: { isActive: popup.isActive },
+    });
+  } catch (error) {
+    console.error("Toggle status error:", error);
+    return res.status(500).json({
+      status: "fail",
+      message: error.message,
+    });
+  }
+};
+
+
 export {
   savePopupDetails,
   getEmployeePopupDetails,
   getAllPopupDetails,
   updatePopupDetails,
   deletePopupDetails,
+  togglePopupStatus
 };
