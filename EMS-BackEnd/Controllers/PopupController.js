@@ -1,6 +1,7 @@
 import { getCurrentMinutes, parseTime } from "../common/timeHelper.js";
 import { Popup } from "../Models/popupModel.js";
 import { getPresignedUrl } from "../storage/s3.config.js";
+import { User } from "../Models/UserModel.js"
 
 const normalizePayload = (payload) => {
   const normalized = {};
@@ -95,18 +96,31 @@ const getEmployeePopupDetails = async (req, res) => {
       });
     }
 
+    // Get employee's country, role, gender from user model
+    const user = await User.findOne({ empNo: employee });
+
+    if (!user) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Employee not found",
+      });
+    }
+
     const now = new Date();
     const currentDate = new Date(now.toISOString().split("T")[0]);
     const nowMinutes = getCurrentMinutes();
 
     const popups = await Popup.find({
-      employee: employee,
       isActive: true,
       startDate: { $lte: currentDate },
       endDate: { $gte: currentDate },
+      // country: { $in: ["all", user.country] },
+      role: { $in: ["all", user.role] },
+      gender: { $in: ["all", user.gender] },
+      employee: { $in: ["all", user.empNo] },
     }).sort({ createdAt: 1 });
 
-    const filteredPopups = popups.filter(popup => {
+    const filteredPopups = popups.filter((popup) => {
       const startMinutes = parseTime(popup.startTime);
       const endMinutes = parseTime(popup.endTime);
 
@@ -118,7 +132,7 @@ const getEmployeePopupDetails = async (req, res) => {
     });
 
     const popupList = await Promise.all(
-      filteredPopups.map(async popup => {
+      filteredPopups.map(async (popup) => {
         if (popup.uploadedFile) {
           const fileKey = popup.uploadedFile;
           const presignedUrl = await getPresignedUrl(fileKey, 3600);
