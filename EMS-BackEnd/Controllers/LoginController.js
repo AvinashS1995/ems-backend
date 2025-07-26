@@ -39,11 +39,10 @@ const Login = async (req, res) => {
     // );
 
     const fileKey = user.profileImage || "";
-    if(fileKey) {
-    const presignedUrl = await getPresignedUrl(fileKey, 3600);
-    user.profileImage = presignedUrl;
+    if (fileKey) {
+      const presignedUrl = await getPresignedUrl(fileKey, 3600);
+      user.profileImage = presignedUrl;
     }
-    
 
     const token = jwt.sign(
       {
@@ -146,23 +145,20 @@ const sendOtp = async (req, res) => {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: "Reset Password for Email OTP Authetication",
+      subject: "🔐 Reset Password - OTP Authentication",
       html: `
-    <div style="max-width: 500px; margin: auto; padding: 20px; font-family: Arial, sans-serif; 
-                border: 1px solid #ddd; border-radius: 10px; box-shadow: 2px 2px 10px rgba(0,0,0,0.1);">
-        <h2 style="color: #4285F4; text-align: center;">Email OTP</h2>
-        <hr style="border: 1px solid #ddd;">
-        <p style="font-size: 16px; text-align: center;">Dear User,</p>
-        <p style="font-size: 16px; text-align: center;">Your One-Time Password (OTP) is:</p>
-        <h1 style="color: #4CAF50; text-align: center; font-size: 36px;">${otpCode}</h1>
-        <p style="font-size: 14px; text-align: center;">Please use this OTP to complete your login Reset Password process. It is valid for 5 minutes.
-            Do not share this code with anyone.</p>
-        <p style="font-size: 14px; text-align: center;">Thank you for using Email OTP!</p>
-        <hr style="border: 1px solid #ddd;">
-        <p style="text-align: center; font-size: 12px; color: #888;">© <a href="https://www.yourwebsite.com" 
-                style="color: #4285F4; text-decoration: none;">employeemanagementsystem.com</a>. All rights reserved.</p>
-    </div>
-  `,
+<div style="max-width: 600px; margin: auto; padding: 20px; font-family: 'Segoe UI', sans-serif; 
+            background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 10px;">
+  <h2 style="text-align:center; color:#4285F4;">Reset Your Password</h2>
+  <p style="text-align:center; font-size:16px;">Use the OTP below to reset your EMS account password.</p>
+  <div style="text-align:center; margin: 20px 0;">
+    <span style="font-size:36px; color:#28a745; font-weight:bold;">${otpCode}</span>
+  </div>
+  <p style="text-align:center; font-size:14px; color:#555;">This OTP is valid for <strong>5 minutes</strong>. Please do not share it with anyone.</p>
+  <hr style="margin: 20px 0;">
+  <p style="text-align:center; font-size:12px; color:#888;">Need help? Contact <a href="mailto:support@employeemanagementsystem.com" style="color:#4285F4;">support@employeemanagementsystem.com</a></p>
+</div>
+`,
     };
 
     transporter.sendMail(mailOptions, (err, info) => {
@@ -209,23 +205,20 @@ const resendOtp = async (req, res) => {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: "Reset Password for Email Resent OTP Authetication",
+      subject: "📩 Resent OTP - Reset Your Password",
       html: `
-    <div style="max-width: 500px; margin: auto; padding: 20px; font-family: Arial, sans-serif; 
-                border: 1px solid #ddd; border-radius: 10px; box-shadow: 2px 2px 10px rgba(0,0,0,0.1);">
-        <h2 style="color: #4285F4; text-align: center;">Email OTP</h2>
-        <hr style="border: 1px solid #ddd;">
-        <p style="font-size: 16px; text-align: center;">Dear User,</p>
-        <p style="font-size: 16px; text-align: center;">Your One-Time Password (OTP) is:</p>
-        <h1 style="color: #4CAF50; text-align: center; font-size: 36px;">${otpCode}</h1>
-        <p style="font-size: 14px; text-align: center;">Please use this OTP to complete your login Reset Password process. It is valid for 5 minutes.
-            Do not share this code with anyone.</p>
-        <p style="font-size: 14px; text-align: center;">Thank you for using Email OTP!</p>
-        <hr style="border: 1px solid #ddd;">
-        <p style="text-align: center; font-size: 12px; color: #888;">© <a href="https://www.yourwebsite.com" 
-                style="color: #4285F4; text-decoration: none;">employeemanagementsystem.com</a>. All rights reserved.</p>
-    </div>
-  `,
+<div style="max-width: 600px; margin: auto; padding: 20px; font-family: 'Segoe UI', sans-serif; 
+            background-color: #fff8f0; border: 1px solid #ffd7b5; border-radius: 10px;">
+  <h2 style="text-align:center; color:#FF9800;">Here's Your New OTP</h2>
+  <p style="text-align:center; font-size:16px;">You requested a new OTP to reset your EMS password.</p>
+  <div style="text-align:center; margin: 20px 0;">
+    <span style="font-size:36px; color:#ff5722; font-weight:bold;">${otpCode}</span>
+  </div>
+  <p style="text-align:center; font-size:14px; color:#555;">This OTP will expire in <strong>5 minutes</strong>.</p>
+  <hr style="margin: 20px 0;">
+  <p style="text-align:center; font-size:12px; color:#888;">If you didn't request this, please ignore the email.</p>
+</div>
+`,
     };
 
     transporter.sendMail(mailOptions, (err, info) => {

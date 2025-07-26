@@ -35,23 +35,20 @@ const sendCheckInsOtp = async (req, res) => {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: "Attendence Check Ins for Email OTP Authetication",
+      subject: "🕒 Attendance Check-In OTP",
       html: `
-    <div style="max-width: 500px; margin: auto; padding: 20px; font-family: Arial, sans-serif; 
-                border: 1px solid #ddd; border-radius: 10px; box-shadow: 2px 2px 10px rgba(0,0,0,0.1);">
-        <h2 style="color: #4285F4; text-align: center;">Email OTP</h2>
-        <hr style="border: 1px solid #ddd;">
-        <p style="font-size: 16px; text-align: center;">Dear User,</p>
-        <p style="font-size: 16px; text-align: center;">Your Attendence Check Ins One-Time Password (OTP) is:</p>
-        <h1 style="color: #4CAF50; text-align: center; font-size: 36px;">${otpCode}</h1>
-        <p style="font-size: 14px; text-align: center;">Please use this OTP to complete your Attendence Check Ins. It is valid for 5 minutes.
-            Do not share this code with anyone.</p>
-        <p style="font-size: 14px; text-align: center;">Thank you for using Email OTP!</p>
-        <hr style="border: 1px solid #ddd;">
-        <p style="text-align: center; font-size: 12px; color: #888;">© <a href="https://www.yourwebsite.com" 
-                style="color: #4285F4; text-decoration: none;">employeemanagementsystem.com</a>. All rights reserved.</p>
-    </div>
-  `,
+<div style="max-width: 600px; margin: auto; padding: 20px; font-family: 'Segoe UI', sans-serif; 
+            background-color: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 10px;">
+  <h2 style="text-align:center; color:#2e7d32;">Check-In OTP</h2>
+  <p style="text-align:center; font-size:16px;">Use the below OTP to verify your attendance check-in.</p>
+  <div style="text-align:center; margin: 20px 0;">
+    <span style="font-size:36px; color:#43a047; font-weight:bold;">${otpCode}</span>
+  </div>
+  <p style="text-align:center; font-size:14px; color:#555;">This OTP is valid for <strong>5 minutes</strong>. Keep it confidential.</p>
+  <hr style="margin: 20px 0;">
+  <p style="text-align:center; font-size:12px; color:#888;">Thank you for using EMS - Attendance Module.</p>
+</div>
+`,
     };
 
     transporter.sendMail(mailOptions, (err, info) => {
@@ -249,7 +246,7 @@ const verifyCheckInsOtp = async (req, res) => {
       checkInTime: currentTime.format("HH:mm:ss"),
     });
   } catch (err) {
-    console.log(err)
+    console.log(err);
     res.status(500).json({
       status: "fail",
       message: "Something went wrong",
@@ -640,7 +637,7 @@ const attendanceSummary = async (req, res) => {
 
     return res.status(200).json({
       status: "success",
-      message: 'Record(s) Fetched Successfully',
+      message: "Record(s) Fetched Successfully",
       summary: {
         totalEmployees,
         presentEmployees: presentCount,
@@ -664,5 +661,5 @@ export {
   checkOut,
   workSummary,
   getAttendance,
-  attendanceSummary
+  attendanceSummary,
 };

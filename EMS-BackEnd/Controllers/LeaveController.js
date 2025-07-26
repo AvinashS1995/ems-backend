@@ -3,6 +3,8 @@ import { Approval } from "../Models/approvalModel.js";
 import { Holidays } from "../Models/holidayModel.js";
 import { Leave } from "../Models/leaveModel.js";
 import { User } from "../Models/UserModel.js";
+import { Popup } from "../Models/popupModel.js";
+import { sendLeaveEmail } from "../mail/sendMailLeaveStatusToEmployee.js";
 
 const typeMap = {
   "Paid Leaves (PL)": "Leave",
@@ -146,7 +148,6 @@ const saveEmployeeLeave = async (req, res) => {
         savedLeave,
       },
     });
-
   } catch (error) {
     console.error("Error in saveEmployeeLeave:", error);
     res.status(500).json({
@@ -181,12 +182,10 @@ const approvalFlow = async (req, res) => {
     // Map leaveType to ApprovalFlow.typeName
     const typeName = typeMap[leave.leaveType];
     if (!typeName) {
-      return res
-        .status(400)
-        .json({
-          status: "fail",
-          message: `Approval mapping not found for leave type: ${leave.leaveType}`,
-        });
+      return res.status(400).json({
+        status: "fail",
+        message: `Approval mapping not found for leave type: ${leave.leaveType}`,
+      });
     }
 
     const approvalFlow = await Approval.findOne({ typeName });
@@ -229,9 +228,9 @@ const LeaveRequestList = async (req, res) => {
       approvalStatus: {
         $elemMatch: {
           empNo: approverEmpNo,
-          status: "Pending"
-        }
-      }
+          status: "Pending",
+        },
+      },
     }).sort({ createAt: -1 });
 
     res.status(200).json({
@@ -242,7 +241,6 @@ const LeaveRequestList = async (req, res) => {
         totalRecords: leaves.length,
       },
     });
-
   } catch (error) {
     res.status(500).json({
       status: "fail",
@@ -251,35 +249,47 @@ const LeaveRequestList = async (req, res) => {
   }
 };
 
-
-
 const approveRejectLeave = async (req, res) => {
   try {
     const { leaveId, action, comments, approverEmpNo } = req.body;
 
     const leave = await Leave.findById(leaveId);
     if (!leave) {
-      return res.status(404).json({ status: 'fail', message: 'Leave not found' });
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Leave not found" });
     }
 
     const approver = await User.findOne({ empNo: approverEmpNo });
     if (!approver) {
-      return res.status(404).json({ status: 'fail', message: 'Approver not found' });
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Approver not found" });
     }
 
     const { role } = approver;
 
     const alreadyActed = leave.approvalStatus.find(
-      (step) => step.empNo === approverEmpNo && step.role === role && step.status !== 'Pending'
+      (step) =>
+        step.empNo === approverEmpNo &&
+        step.role === role &&
+        step.status !== "Pending"
     );
 
     if (alreadyActed) {
-      return res.status(400).json({ status: 'fail', message: 'You have already taken action' });
+      return res
+        .status(400)
+        .json({ status: "fail", message: "You have already taken action" });
     }
 
     // Remove old pending entry
     leave.approvalStatus = leave.approvalStatus.filter(
-      (s) => !(s.empNo === approverEmpNo && s.role === role && s.status === 'Pending')
+      (s) =>
+        !(
+          s.empNo === approverEmpNo &&
+          s.role === role &&
+          s.status === "Pending"
+        )
     );
 
     // Add current approver action
@@ -287,7 +297,7 @@ const approveRejectLeave = async (req, res) => {
       role,
       empNo: approverEmpNo,
       name: `${approver.firstName} ${approver.lastName}`,
-      status: action === 'Approved' ? 'Approved' : 'Rejected',
+      status: action === "Approved" ? "Approved" : "Rejected",
       comments,
       actionDate: new Date(),
     });
@@ -305,12 +315,66 @@ const approveRejectLeave = async (req, res) => {
     );
 
     // Find next pending approver
-    const nextPending = stepperData.find((step) => step.status === 'Pending');
+    const nextPending = stepperData.find((step) => step.status === "Pending");
 
-    if (action === 'Rejected') {
+    const applicant = await User.findOne({ empNo: leave.empNo });
+
+    if (action === "Rejected") {
+      leave.status = `Rejected by ${role}`;
+
+      if (applicant) {
+        await Popup.create({
+          name: "Leave Rejected",
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+          startTime: "12:00 AM",
+          endTime: "11:59 PM",
+          country: applicant.country || "India",
+          role: applicant.role,
+          gender: applicant.gender,
+          employee: applicant.empNo,
+          popupType: "text",
+          textMessage: "Your leave has been rejected.",
+          isActive: true,
+        });
+
+        await sendLeaveEmail({
+          to: applicant.email,
+          name: `${applicant.firstName} ${applicant.lastName}`,
+          status: "Rejected",
+        });
+      }
+    } else if (!nextPending) {
+      leave.status = "Approved";
+
+      if (applicant) {
+        await Popup.create({
+          name: "Leave Approved",
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+          startTime: "12:00 AM",
+          endTime: "11:59 PM",
+          country: applicant.country || "India",
+          role: applicant.role,
+          gender: applicant.gender,
+          employee: applicant.empNo,
+          popupType: "text",
+          textMessage: "Your leave has been approved.",
+          isActive: true,
+        });
+
+        await sendLeaveEmail({
+          to: applicant.email,
+          name: `${applicant.firstName} ${applicant.lastName}`,
+          status: "Approved",
+        });
+      }
+    }
+
+    if (action === "Rejected") {
       leave.status = `Rejected by ${role}`;
     } else if (!nextPending) {
-      leave.status = 'Approved';
+      leave.status = "Approved";
     } else {
       // Check if already exists in approvalStatus
       const alreadyExists = leave.approvalStatus.some(
@@ -321,8 +385,8 @@ const approveRejectLeave = async (req, res) => {
         leave.approvalStatus.push({
           role: nextPending.role,
           empNo: nextPending.empNo,
-          name: nextPending.name.split(' - ')[0], // clean name
-          status: 'Pending',
+          name: nextPending.name.split(" - ")[0], // clean name
+          status: "Pending",
           comments: null,
           actionDate: null,
         });
@@ -337,14 +401,13 @@ const approveRejectLeave = async (req, res) => {
     const updatedLeave = await leave.save();
 
     res.status(200).json({
-      status: 'success',
+      status: "success",
       message: `Leave ${action}ed successfully`,
       data: updatedLeave,
     });
-
   } catch (error) {
     console.error("Error in approveRejectLeave:", error);
-    res.status(500).json({ status: 'fail', message: error.message });
+    res.status(500).json({ status: "fail", message: error.message });
   }
 };
 
@@ -375,7 +438,6 @@ const getAllLeaves = async (req, res) => {
     res.status(500).json({ status: "fail", message: error.message });
   }
 };
-
 
 export {
   GetUpcomingHolidays,
