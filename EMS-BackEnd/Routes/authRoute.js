@@ -34,6 +34,8 @@ const router = express.Router();
  *                 type: string
  *               address:
  *                 type: string
+ *               country:
+ *                 type: string
  *               mobile:
  *                 type: string
  *               role:
@@ -269,7 +271,7 @@ router.post('/log-out', LogOut)
  *       500:
  *         description: Server error
  */
-router.post('/get-user-list', authenticateToken, GetUserList)
+router.post('/get-user-list', GetUserList)
 /**
  * @swagger
  * /api/auth/update-employee-list:

@@ -323,20 +323,20 @@ const approveRejectLeave = async (req, res) => {
       leave.status = `Rejected by ${role}`;
 
       if (applicant) {
-        await Popup.create({
-          name: "Leave Rejected",
-          startDate: new Date(),
-          endDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
-          startTime: "12:00 AM",
-          endTime: "11:59 PM",
-          country: applicant.country || "India",
-          role: applicant.role,
-          gender: applicant.gender,
-          employee: applicant.empNo,
-          popupType: "text",
-          textMessage: "Your leave has been rejected.",
-          isActive: true,
-        });
+        // await Popup.create({
+        //   name: "Leave Rejected",
+        //   startDate: new Date(),
+        //   endDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+        //   startTime: "12:00 AM",
+        //   endTime: "11:59 PM",
+        //   country: applicant.country || "India",
+        //   role: applicant.role,
+        //   gender: applicant.gender,
+        //   employee: applicant.empNo,
+        //   popupType: "text",
+        //   textMessage: "Your leave has been rejected.",
+        //   isActive: true,
+        // });
 
         await sendLeaveEmail({
           to: applicant.email,
@@ -348,20 +348,20 @@ const approveRejectLeave = async (req, res) => {
       leave.status = "Approved";
 
       if (applicant) {
-        await Popup.create({
-          name: "Leave Approved",
-          startDate: new Date(),
-          endDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
-          startTime: "12:00 AM",
-          endTime: "11:59 PM",
-          country: applicant.country || "India",
-          role: applicant.role,
-          gender: applicant.gender,
-          employee: applicant.empNo,
-          popupType: "text",
-          textMessage: "Your leave has been approved.",
-          isActive: true,
-        });
+        // await Popup.create({
+        //   name: "Leave Approved",
+        //   startDate: new Date(),
+        //   endDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+        //   startTime: "12:00 AM",
+        //   endTime: "11:59 PM",
+        //   country: applicant.country || "India",
+        //   role: applicant.role,
+        //   gender: applicant.gender,
+        //   employee: applicant.empNo,
+        //   popupType: "text",
+        //   textMessage: "Your leave has been approved.",
+        //   isActive: true,
+        // });
 
         await sendLeaveEmail({
           to: applicant.email,

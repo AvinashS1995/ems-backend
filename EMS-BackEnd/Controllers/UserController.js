@@ -14,6 +14,7 @@ const CreateUser = async (req, res) => {
       gender,
       email,
       address,
+      country,
       department,
       role,
       mobile,
@@ -78,6 +79,7 @@ const CreateUser = async (req, res) => {
       gender,
       email,
       address,
+      country,
       password: hashPassword,
       role,
       mobile,
@@ -195,6 +197,7 @@ const UpdateEmployeeList = async (req, res) => {
       dob,
       gender,
       address,
+      country,
       email,
       mobile,
       role,
@@ -225,6 +228,7 @@ const UpdateEmployeeList = async (req, res) => {
     existingType.dob = dob;
     existingType.gender = gender;
     existingType.address = address;
+    existingType.country = country;
     existingType.email = email;
     existingType.mobile = mobile;
     existingType.role = role;

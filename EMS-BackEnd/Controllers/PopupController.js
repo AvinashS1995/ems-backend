@@ -1,7 +1,7 @@
 import { getCurrentMinutes, parseTime } from "../common/timeHelper.js";
 import { Popup } from "../Models/popupModel.js";
 import { getPresignedUrl } from "../storage/s3.config.js";
-import { User } from "../Models/UserModel.js"
+import { User } from "../Models/UserModel.js";
 
 const normalizePayload = (payload) => {
   const normalized = {};
@@ -14,7 +14,6 @@ const normalizePayload = (payload) => {
   }
   return normalized;
 };
-
 
 const savePopupDetails = async (req, res) => {
   try {
@@ -85,6 +84,7 @@ const savePopupDetails = async (req, res) => {
   }
 };
 
+
 const getEmployeePopupDetails = async (req, res) => {
   try {
     const { employee } = req.body;
@@ -96,7 +96,7 @@ const getEmployeePopupDetails = async (req, res) => {
       });
     }
 
-    // Get employee's country, role, gender from user model
+    // Get employee data
     const user = await User.findOne({ empNo: employee });
 
     if (!user) {
@@ -110,17 +110,50 @@ const getEmployeePopupDetails = async (req, res) => {
     const currentDate = new Date(now.toISOString().split("T")[0]);
     const nowMinutes = getCurrentMinutes();
 
-    const popups = await Popup.find({
+    // Get all active popups in valid date range
+    const activePopups = await Popup.find({
       isActive: true,
       startDate: { $lte: currentDate },
       endDate: { $gte: currentDate },
-      // country: { $in: ["all", user.country] },
-      role: { $in: ["all", user.role] },
-      gender: { $in: ["all", user.gender] },
-      employee: { $in: ["all", user.empNo] },
     }).sort({ createdAt: 1 });
 
-    const filteredPopups = popups.filter((popup) => {
+    // Normalize helper
+    const normalize = (val) =>
+      typeof val === "string" ? val.trim().toLowerCase() : "";
+
+    const userCountry = normalize(user.country);
+    const userRole = normalize(user.role);
+    const userGender = normalize(user.gender);
+    const userEmpNo = user.empNo?.trim();
+
+    // Filter by access rules (country, role, gender, employee)
+    const visiblePopups = activePopups.filter((popup) => {
+      const popupCountry = normalize(popup.country);
+      const popupRole = normalize(popup.role);
+      const popupGender = normalize(popup.gender);
+      const popupEmpNo = popup.employee?.trim();
+
+      const matchCountry =
+        !popup.country ||
+        popupCountry === "all" ||
+        popupCountry === userCountry;
+
+      const matchRole =
+        !popup.role || popupRole === "all" || popupRole === userRole;
+
+      const matchGender =
+        !popup.gender || popupGender === "all" || popupGender === userGender;
+
+      const matchEmployee =
+        !popup.employee ||
+        popupEmpNo === "all" ||
+        popupEmpNo === userEmpNo;
+
+      return matchCountry && matchRole && matchGender && matchEmployee;
+    });
+
+    // Filter by time
+    const filteredPopups = visiblePopups.filter((popup) => {
       const startMinutes = parseTime(popup.startTime);
       const endMinutes = parseTime(popup.endTime);
 
@@ -131,11 +164,14 @@ const getEmployeePopupDetails = async (req, res) => {
       }
     });
 
+    // Attach file URL if popupType is file
     const popupList = await Promise.all(
       filteredPopups.map(async (popup) => {
         if (popup.uploadedFile) {
-          const fileKey = popup.uploadedFile;
-          const presignedUrl = await getPresignedUrl(fileKey, 3600);
+          const presignedUrl = await getPresignedUrl(
+            popup.uploadedFile,
+            3600
+          );
           popup.uploadedFile = presignedUrl;
         } else {
           popup.uploadedFile = null;
@@ -144,12 +180,18 @@ const getEmployeePopupDetails = async (req, res) => {
       })
     );
 
+    // Debug log
+    console.log("User:", userRole, userGender, userEmpNo, userCountry);
+    console.log("Visible popups:", visiblePopups.map((p) => p.name));
+    console.log("Final popups after time filter:", popupList.length);
+
     return res.status(200).json({
       status: "success",
       message: "Filtered popups retrieved successfully",
       data: popupList,
     });
   } catch (error) {
+    console.error("Error in getEmployeePopupDetails:", error);
     return res.status(500).json({
       status: "fail",
       message: error.message,
@@ -157,14 +199,9 @@ const getEmployeePopupDetails = async (req, res) => {
   }
 };
 
-
-
-
-
 const getAllPopupDetails = async (req, res) => {
   try {
-
-   const { startDate, endDate, role, isActive, popupType } = req.body;
+    const { startDate, endDate, role, isActive, popupType } = req.body;
 
     const query = {};
 
@@ -177,7 +214,7 @@ const getAllPopupDetails = async (req, res) => {
       query.role = role;
     }
 
-    if (typeof isActive === 'boolean') {
+    if (typeof isActive === "boolean") {
       query.isActive = isActive;
     }
 
@@ -191,12 +228,15 @@ const getAllPopupDetails = async (req, res) => {
 
     const total = await Popup.countDocuments();
 
-    const popup = await Popup.find(query).skip(skip).limit(limit).select("-__v");
+    const popup = await Popup.find(query)
+      .skip(skip)
+      .limit(limit)
+      .select("-__v");
 
     const popupList = await Promise.all(
       popup.map(async (popup) => {
         if (popup.uploadedFile) {
-          const fileKey = popup.uploadedFile; 
+          const fileKey = popup.uploadedFile;
           const presignedUrl = await getPresignedUrl(fileKey, 3600);
           popup.uploadedFile = presignedUrl;
         } else {
@@ -213,7 +253,7 @@ const getAllPopupDetails = async (req, res) => {
         currentPage: page,
         totalPages: Math.ceil(total / limit),
         totalRecords: total,
-        popupList
+        popupList,
       },
     });
   } catch (error) {
@@ -245,11 +285,11 @@ const updatePopupDetails = async (req, res) => {
     } = req.body;
 
     if (!id) {
-      return res.status(400).json({ 
-      status: "fail",
-      message: "Popup ID is required" 
-    });
-  }
+      return res.status(400).json({
+        status: "fail",
+        message: "Popup ID is required",
+      });
+    }
 
     const updateData = {
       name,
@@ -272,7 +312,6 @@ const updatePopupDetails = async (req, res) => {
     const updatedPopup = await Popup.findByIdAndUpdate(id, finalUpdate, {
       new: true,
     });
-
 
     if (!updatedPopup) {
       return res.status(404).json({
@@ -330,7 +369,7 @@ const deletePopupDetails = async (req, res) => {
   }
 };
 
- const togglePopupStatus = async (req, res) => {
+const togglePopupStatus = async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) {
@@ -353,7 +392,9 @@ const deletePopupDetails = async (req, res) => {
 
     return res.status(200).json({
       status: "success",
-      message: `Popup status updated to ${popup.isActive ? "Active" : "Inactive"}`,
+      message: `Popup status updated to ${
+        popup.isActive ? "Active" : "Inactive"
+      }`,
       data: { isActive: popup.isActive },
     });
   } catch (error) {
@@ -365,12 +406,11 @@ const deletePopupDetails = async (req, res) => {
   }
 };
 
-
 export {
   savePopupDetails,
   getEmployeePopupDetails,
   getAllPopupDetails,
   updatePopupDetails,
   deletePopupDetails,
-  togglePopupStatus
+  togglePopupStatus,
 };

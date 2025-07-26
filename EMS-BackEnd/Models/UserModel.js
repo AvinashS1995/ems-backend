@@ -37,6 +37,9 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Address is required field'],
     },
+    country: {
+        type: String,
+    },
     password: {
         type: String,
         required: [true, 'Password is required field']
