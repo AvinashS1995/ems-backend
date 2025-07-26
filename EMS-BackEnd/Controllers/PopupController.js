@@ -110,34 +110,31 @@ const getEmployeePopupDetails = async (req, res) => {
       const startMinutes = parseTime(popup.startTime);
       const endMinutes = parseTime(popup.endTime);
 
-      // If popup crosses midnight (start > end)
       if (startMinutes > endMinutes) {
         return nowMinutes >= startMinutes || nowMinutes <= endMinutes;
+      } else {
+        return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
       }
-
-      // Normal within-day range
-      return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
     });
 
     const popupList = await Promise.all(
-      filteredPopups.map(async (filteredPopups) => {
-        if (filteredPopups.uploadedFile) {
-          const fileKey = filteredPopups.uploadedFile; 
+      filteredPopups.map(async popup => {
+        if (popup.uploadedFile) {
+          const fileKey = popup.uploadedFile;
           const presignedUrl = await getPresignedUrl(fileKey, 3600);
-          filteredPopups.uploadedFile = presignedUrl;
+          popup.uploadedFile = presignedUrl;
         } else {
-          filteredPopups.uploadedFile = null;
+          popup.uploadedFile = null;
         }
-        return filteredPopups;
+        return popup;
       })
     );
 
     return res.status(200).json({
       status: "success",
-      message: "Record(s) Fetched Successfully!",
+      message: "Filtered popups retrieved successfully",
       data: popupList,
     });
-
   } catch (error) {
     return res.status(500).json({
       status: "fail",
@@ -145,6 +142,7 @@ const getEmployeePopupDetails = async (req, res) => {
     });
   }
 };
+
 
 
 
@@ -336,7 +334,6 @@ const deletePopupDetails = async (req, res) => {
       });
     }
 
-    // Toggle the status
     popup.isActive = !popup.isActive;
     await popup.save();
 

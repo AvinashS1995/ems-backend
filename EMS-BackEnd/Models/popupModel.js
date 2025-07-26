@@ -8,19 +8,15 @@ const popupSchema = new mongoose.Schema(
     },
     startDate: {
       type: Date,
-      required: [true, "Popup Start Date is Required Field!"],
     },
     endDate: {
       type: Date,
-      required: [true, "Popup End Date is Required Field!"],
     },
     startTime: {
       type: String,
-      required: [true, "Popup Start Time is Required Field!"],
     },
     endTime: {
       type: String,
-      required: [true, "Popup End Time is Required Field!"],
     },
     country: {
       type: String,
