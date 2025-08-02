@@ -11,6 +11,4 @@ function getCurrentMinutes() {
   return now.getHours() * 60 + now.getMinutes();
 }
 
-
-
-export { parseTime, getCurrentMinutes }
+export { parseTime, getCurrentMinutes };

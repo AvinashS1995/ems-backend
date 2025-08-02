@@ -139,7 +139,7 @@ router.post('/get-attendence-list', getAttendance);
  *   get:
  *     summary: Get Attendece Today Summary 
  *     tags:
- *       - Menu
+ *       - Attendence
  *     responses:
  *       200:
  *         description: Get Records successfully
