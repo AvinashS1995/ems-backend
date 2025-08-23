@@ -2,7 +2,14 @@ import { ConnectToDatabase } from "../db/db.js";
 import { Type, User, UserReporting } from "../Models/UserModel.js";
 import bcrypt from "bcrypt";
 import { getPresignedUrl } from "../storage/s3.config.js";
-import { extractEmpNo, generateEmpNo } from "../common/employee.utilis.js";
+import {
+  extractEmpNo,
+  generateBankAccNo,
+  generateEmpNo,
+  generatePAN,
+  generatePFNo,
+  generateUAN,
+} from "../common/employee.utilis.js";
 
 const CreateUser = async (req, res) => {
   try {
@@ -64,7 +71,7 @@ const CreateUser = async (req, res) => {
     //   const newNumber = lastNumber + 1;
     //   empNo = `EMP${String(newNumber).padStart(3, "0")}`;
     // }
-    
+
     const empNo = await generateEmpNo(User);
 
     const password = "Admin@1234";
@@ -91,6 +98,12 @@ const CreateUser = async (req, res) => {
       joiningDate,
       salary,
       workType,
+      // 🔹 Auto-generate Bank Details
+      bankName: "ICICI BANK",
+      bankAccNo: generateBankAccNo(),
+      pfNo: generatePFNo(),
+      uan: generateUAN(),
+      pan: generatePAN(),
     });
 
     await newUser.save();
@@ -99,12 +112,11 @@ const CreateUser = async (req, res) => {
     const reportedByEmpID = extractEmpNo(reportedBy); // EMP0056
 
     if (reportedByEmpID) {
- await UserReporting.create({
-      employee: empNo,
-      reportedByEmployee: reportedByEmpID,
-    });
+      await UserReporting.create({
+        employee: empNo,
+        reportedByEmployee: reportedByEmpID,
+      });
     }
-   
 
     res.status(201).json({
       status: "success",
@@ -240,8 +252,13 @@ const UpdateEmployeeList = async (req, res) => {
     existingType.salary = salary;
     existingType.workType = workType;
     existingType.profileImage = profileImage;
-
-    await existingType.save();
+    // 🔹 Auto-generate Bank Details
+    (existingType.bankName = "ICICI BANK"),
+      (existingType.bankAccNo = generateBankAccNo()),
+      (existingType.pfNo = generatePFNo()),
+      (existingType.uan = generateUAN()),
+      (existingType.pan = generatePAN()),
+      await existingType.save();
 
     // Update UserReporting if `reportedBy` changed
     if (reportedBy !== existingType.reportedBy) {
@@ -385,7 +402,8 @@ const GetTypeList = async (req, res) => {
 
 const UpdateTypeList = async (req, res) => {
   try {
-    const { id, entityValue, typeLabel, departmentType, description } = req.body;
+    const { id, entityValue, typeLabel, departmentType, description } =
+      req.body;
 
     const existingType = await Type.findById(id);
     // console.log(existingType);

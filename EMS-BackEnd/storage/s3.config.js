@@ -1,9 +1,13 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { v4 as uuidv4 } from 'uuid';
-import dotenv from 'dotenv';
-dotenv.config({path:'./.env'});
-
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { v4 as uuidv4 } from "uuid";
+import fs from "fs";
+import dotenv from "dotenv";
+dotenv.config({ path: "./.env" });
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION,
@@ -53,4 +57,18 @@ const deleteFromFilebase = async (fileKey) => {
   await s3Client.send(command);
 };
 
-export  { s3Client, getPresignedUrl, uploadToFilebase, deleteFromFilebase};
+export const uploadPDF = async ({ localPath, bucket, key }) => {
+  const Body = fs.readFileSync(localPath);
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body,
+      ContentType: "application/pdf",
+    })
+  );
+  // Public URL pattern for Filebase
+  return `https://${bucket}.s3.filebase.com/${key}`;
+};
+
+export { s3Client, getPresignedUrl, uploadToFilebase, deleteFromFilebase };
