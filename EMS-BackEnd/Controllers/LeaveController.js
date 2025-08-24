@@ -1,9 +1,8 @@
 import { getApprovalStepEmployees } from "../common/employee.utilis.js";
 import { Approval } from "../Models/approvalModel.js";
 import { Holidays } from "../Models/holidayModel.js";
-import { Leave } from "../Models/leaveModel.js";
+import { Leave, LeaveBalance } from "../Models/leaveModel.js";
 import { User } from "../Models/UserModel.js";
-import { Popup } from "../Models/popupModel.js";
 import { sendLeaveEmail } from "../mail/sendMailLeaveStatusToEmployee.js";
 
 const typeMap = {
@@ -77,6 +76,53 @@ const saveEmployeeLeave = async (req, res) => {
         status: "fail",
         message: `Approval mapping not found for leave type: ${leaveType}`,
       });
+    }
+
+    console.log(leaveType);
+    if (
+      leaveType === "Casual Leave (CL)" ||
+      leaveType === "Sick Leave (SL)" ||
+      leaveType === "Paid Leaves (PL)"
+    ) {
+      const leaveBalance = await LeaveBalance.findOne({ empNo });
+      console.log(leaveDuration);
+      if (leaveBalance) {
+        let days = 0;
+        if (leaveDuration === "Full Day") {
+          days = 1;
+        } else if (leaveDuration === "Half Day") {
+          days = 0.5;
+        } else {
+          return res.status(400).json({
+            status: "fail",
+            message: "Invalid leave duration. Allowed: Full Day or Half Day",
+          });
+        }
+
+        const diffDays =
+          (new Date(toDate) - new Date(fromDate)) / (1000 * 60 * 60 * 24) + 1;
+
+        const totalDays = diffDays * days;
+
+        if (leaveType.includes("Casual")) {
+          leaveBalance.casualLeave = Math.max(
+            Number(leaveBalance.casualLeave || 0) - totalDays,
+            0
+          );
+        } else if (leaveType.includes("Sick")) {
+          leaveBalance.sickLeave = Math.max(
+            Number(leaveBalance.sickLeave || 0) - totalDays,
+            0
+          );
+        } else if (leaveType.includes("Paid")) {
+          leaveBalance.paidLeave = Math.max(
+            Number(leaveBalance.paidLeave || 0) - totalDays,
+            0
+          );
+        }
+
+        await leaveBalance.save();
+      }
     }
 
     // 3. Fetch approval flow
@@ -322,6 +368,25 @@ const approveRejectLeave = async (req, res) => {
     if (action === "Rejected") {
       leave.status = `Rejected by ${role}`;
 
+      const leaveBalance = await LeaveBalance.findOne({ empNo: leave.empNo });
+      if (leaveBalance) {
+        const leaveDays =
+          Math.ceil(
+            (new Date(leave.toDate) - new Date(leave.fromDate)) /
+              (1000 * 60 * 60 * 24)
+          ) + 1; // inclusive days
+
+        if (leave.leaveType.includes("Casual")) {
+          leaveBalance.casualLeave += leaveDays;
+        } else if (leave.leaveType.includes("Sick")) {
+          leaveBalance.sickLeave += leaveDays;
+        } else if (leave.leaveType.includes("Paid")) {
+          leaveBalance.paidLeave += leaveDays;
+        }
+
+        await leaveBalance.save();
+      }
+
       if (applicant) {
         // await Popup.create({
         //   name: "Leave Rejected",
@@ -439,6 +504,108 @@ const getAllLeaves = async (req, res) => {
   }
 };
 
+// 📌 Create leave balance (pro-rata calculation)
+const createLeaveBalance = async (req, res) => {
+  try {
+    const { empNo, doj } = req.body;
+
+    const joiningDate = new Date(doj);
+    const remainingMonths = 12 - joiningDate.getMonth();
+
+    const casualLeave = Math.round((7 / 12) * remainingMonths);
+    const sickLeave = Math.round((7 / 12) * remainingMonths);
+    const paidLeave = Math.round((15 / 12) * remainingMonths);
+
+    const leaveBalance = new LeaveBalance({
+      empNo,
+      casualLeave,
+      sickLeave,
+      paidLeave,
+    });
+
+    await leaveBalance.save();
+    res.status(201).json({
+      status: "success",
+      message: "Successfully Leave Balance Created!",
+      data: { leaveBalance },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 📌 Get leave balance by employee
+const getLeaveBalance = async (req, res) => {
+  try {
+    const { empNo } = req.body;
+    const leaveBalance = await LeaveBalance.findOne({ empNo });
+
+    if (!leaveBalance) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Leave balance not found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Successfully Leave Balance Fetched!",
+      data: {
+        leaveBalance,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ status: "fail", message: error.message });
+  }
+};
+
+// 📌 Update leave balance
+const updateLeaveBalance = async (req, res) => {
+  try {
+    const { empNo, type, days } = req.body;
+
+    const leaveBalance = await LeaveBalance.findOne({ empNo });
+    if (!leaveBalance) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Leave balance not found" });
+    }
+
+    if (leaveBalance[type] !== undefined) {
+      leaveBalance[type] = Math.max(leaveBalance[type] - days, 0);
+    } else {
+      return res
+        .status(400)
+        .json({ status: "fail", message: "Invalid leave type" });
+    }
+
+    await leaveBalance.save();
+    res.status(200).json({
+      status: "success",
+      message: "Successfully Leave Balance Updated!",
+      data: {
+        leaveBalance,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 📌 Get all employees leave balances
+const getAllLeaveBalances = async (req, res) => {
+  try {
+    const balances = await LeaveBalance.find();
+    res.status(200).json({
+      success: "success",
+      message: "Record(s) Fetched Successfully!",
+      data: { balances },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export {
   GetUpcomingHolidays,
   saveEmployeeLeave,
@@ -446,4 +613,8 @@ export {
   LeaveRequestList,
   approveRejectLeave,
   getAllLeaves,
+  createLeaveBalance,
+  getLeaveBalance,
+  updateLeaveBalance,
+  getAllLeaveBalances,
 };

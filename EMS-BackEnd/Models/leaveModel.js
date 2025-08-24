@@ -45,15 +45,15 @@ const leaveSchema = new mongoose.Schema({
   updatedBy: {
     type: String,
   },
-   approvalStatus: [
+  approvalStatus: [
     {
       role: String,
       empNo: String,
       name: String,
       status: String, // Pending, Approved, Submitted, Rejected
       comments: String,
-      actionDate: String
-    }
+      actionDate: String,
+    },
   ],
   updateAt: {
     type: Date,
@@ -67,27 +67,15 @@ const leaveSchema = new mongoose.Schema({
 
 const Leave = mongoose.model("Leave", leaveSchema);
 
-const employeeApproverMappingSchema = new mongoose.Schema({
-  empNo: { 
-    type: String, 
-    required: true, 
-    unique: true 
-  },
-  tlApprover: { 
-    type: String, 
-    required: true 
-  },       
-  managerApprover: { 
-    type: String, 
-    required: true 
-  },  
-  hrApprover: { 
-    type: String, 
-    required: true 
-  }        
+const leaveBalanceSchema = new mongoose.Schema({
+  empNo: { type: String, required: true },
+  year: { type: Number, default: new Date().getFullYear() },
+  casualLeave: { type: Number, default: 7 },
+  sickLeave: { type: Number, default: 7 },
+  paidLeave: { type: Number, default: 15 },
+  carriedForward: { type: Number, default: 0 },
 });
 
-const EmployeeApprover = mongoose.model('EmployeeApprover', employeeApproverMappingSchema);
+const LeaveBalance = mongoose.model("LeaveBalance", leaveBalanceSchema);
 
-
-export { Leave, EmployeeApprover };
+export { Leave, LeaveBalance };

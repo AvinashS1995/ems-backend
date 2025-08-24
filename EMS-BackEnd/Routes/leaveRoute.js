@@ -1,7 +1,17 @@
-import express from 'express';
-import { approvalFlow, approveRejectLeave, getAllLeaves, GetUpcomingHolidays, LeaveRequestList, saveEmployeeLeave } from "../Controllers/LeaveController.js";
-import { authenticateToken } from '../Middlewares/verifyTokenMiddleware.js';
-
+import express from "express";
+import {
+  approvalFlow,
+  approveRejectLeave,
+  createLeaveBalance,
+  getAllLeaveBalances,
+  getAllLeaves,
+  getLeaveBalance,
+  GetUpcomingHolidays,
+  LeaveRequestList,
+  saveEmployeeLeave,
+  updateLeaveBalance,
+} from "../Controllers/LeaveController.js";
+import { authenticateToken } from "../Middlewares/verifyTokenMiddleware.js";
 
 const router = express.Router();
 
@@ -43,7 +53,7 @@ const router = express.Router();
  *       500:
  *         description: Server error
  */
-router.post('/save-employee-leave', authenticateToken, saveEmployeeLeave)
+router.post("/save-employee-leave", authenticateToken, saveEmployeeLeave);
 /**
  * @swagger
  * /api/leave/get-employee-all-leave:
@@ -68,7 +78,7 @@ router.post('/save-employee-leave', authenticateToken, saveEmployeeLeave)
  *       500:
  *         description: Server error
  */
-router.post('/get-employee-all-leave', authenticateToken, getAllLeaves)
+router.post("/get-employee-all-leave", authenticateToken, getAllLeaves);
 /**
  * @swagger
  * /api/leave/get-empployee-leave-request-list:
@@ -95,7 +105,7 @@ router.post('/get-employee-all-leave', authenticateToken, getAllLeaves)
  *       500:
  *         description: Server error
  */
-router.post('/get-empployee-leave-request-list', LeaveRequestList)
+router.post("/get-empployee-leave-request-list", LeaveRequestList);
 /**
  * @swagger
  * /api/leave/employee-leave-application-approve-reject:
@@ -128,7 +138,11 @@ router.post('/get-empployee-leave-request-list', LeaveRequestList)
  *       500:
  *         description: Server error
  */
-router.post('/employee-leave-application-approve-reject', authenticateToken, approveRejectLeave)
+router.post(
+  "/employee-leave-application-approve-reject",
+  authenticateToken,
+  approveRejectLeave
+);
 /**
  * @swagger
  * /api/leave/application-approval-flow:
@@ -153,7 +167,7 @@ router.post('/employee-leave-application-approve-reject', authenticateToken, app
  *       500:
  *         description: Server error
  */
-router.post('/application-approval-flow', authenticateToken, approvalFlow)
+router.post("/application-approval-flow", authenticateToken, approvalFlow);
 /**
  * @swagger
  * /api/leave/get-upcoming-holidays:
@@ -169,6 +183,104 @@ router.post('/application-approval-flow', authenticateToken, approvalFlow)
  *       500:
  *         description: Server error
  */
-router.get('/get-upcoming-holidays', GetUpcomingHolidays)
+router.get("/get-upcoming-holidays", GetUpcomingHolidays);
+/**
+ * @swagger
+ * /api/leave/save-leave-balance:
+ *   post:
+ *     summary: Create Employee Leave Balance (Pro-rata based on DOJ)
+ *     tags: [Leave]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               empNo:
+ *                 type: string
+ *               doj:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Leave Balance created successfully
+ *       400:
+ *         description: Invalid request
+ *       500:
+ *         description: Server error
+ */
+router.post("/save-leave-balance", createLeaveBalance);
+
+/**
+ * @swagger
+ * /api/leave/get-leave-balance:
+ *   post:
+ *     summary: Get Leave Balance of an Employee
+ *     tags: [Leave]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               empNo:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Leave Balance fetched successfully
+ *       404:
+ *         description: Employee not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/get-leave-balance", getLeaveBalance);
+
+/**
+ * @swagger
+ * /api/leave/get-all-leave-balance:
+ *   post:
+ *     summary: Get All Employees Leave Balances
+ *     tags: [Leave]
+ *     requestBody:
+ *       required: false
+ *     responses:
+ *       200:
+ *         description: Successfully fetched all leave balances
+ *       500:
+ *         description: Server error
+ */
+router.post("/get-all-leave-balance", getAllLeaveBalances);
+
+/**
+ * @swagger
+ * /api/leave/update-leave-balance:
+ *   post:
+ *     summary: Update (deduct) Employee Leave Balance
+ *     tags: [Leave]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               empNo:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *               days:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Leave Balance updated successfully
+ *       404:
+ *         description: Record not found
+ *       400:
+ *         description: Invalid leave type
+ *       500:
+ *         description: Server error
+ */
+router.post("/update-leave-balance", updateLeaveBalance);
 
 export default router;
