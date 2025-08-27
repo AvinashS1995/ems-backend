@@ -315,76 +315,75 @@ const UpdateEmployeeList = async (req, res) => {
     existingType.workType = workType;
     existingType.profileImage = profileImage;
     // 🔹 Auto-generate Bank Details
-    // (existingType.bankName = "ICICI BANK"),
-    //   (existingType.bankAccNo = generateBankAccNo()),
-    //   (existingType.pfNo = generatePFNo()),
-    //   (existingType.uan = generateUAN()),
-    //   (existingType.pan = generatePAN()),
+    (existingType.bankName = "ICICI BANK"),
+      (existingType.bankAccNo = generateBankAccNo()),
+      (existingType.pfNo = generatePFNo()),
+      (existingType.uan = generateUAN()),
+      (existingType.pan = generatePAN()),
+      // if (salary) {
+      //   const breakup = calculateSalaryBreakup(salary);
 
-    // if (salary) {
-    //   const breakup = calculateSalaryBreakup(salary);
+      //   console.log("Breakup---->", breakup);
 
-    //   console.log("Breakup---->", breakup);
+      //   await EmployeeAnnuallySalaryBreakup.create({
+      //     empNo: existingType.empNo,
+      //     firstName: existingType.firstName,
+      //     lastName: existingType.lastName,
+      //     annualCTC: existingType.salary,
+      //     components: {
+      //       monthly: breakup.monthly,
+      //       yearly: breakup.yearly,
+      //     },
+      //   });
 
-    //   await EmployeeAnnuallySalaryBreakup.create({
-    //     empNo: existingType.empNo,
-    //     firstName: existingType.firstName,
-    //     lastName: existingType.lastName,
-    //     annualCTC: existingType.salary,
-    //     components: {
-    //       monthly: breakup.monthly,
-    //       yearly: breakup.yearly,
-    //     },
-    //   });
+      //   const ctcBreakup = await EmployeeAnnuallySalaryBreakup.findOne({
+      //     empNo: existingType.empNo,
+      //   });
 
-    //   const ctcBreakup = await EmployeeAnnuallySalaryBreakup.findOne({
-    //     empNo: existingType.empNo,
-    //   });
+      //   // console.log(ctcBreakup);
+      //   // Generate Offer Letter HTML
+      //   const html = offerLetterTemplate({
+      //     issueDate: new Date().toLocaleDateString("en-GB"),
+      //     joiningDate: formatDate(existingType.joiningDate),
+      //     employee: {
+      //       firstName: existingType.firstName,
+      //       lastName: existingType.lastName,
+      //       employeeId: existingType.empNo,
+      //       designation: existingType.designation,
+      //       department: existingType.department,
+      //       location: existingType.country || "India",
+      //       address: existingType.address,
+      //     },
+      //     salary: {
+      //       ctc: ctcBreakup.annualCTC,
+      //       monthly: ctcBreakup.components.monthly,
+      //       yearly: ctcBreakup.components.yearly,
+      //       probation: "6 Months",
+      //     },
+      //     policy: {
+      //       workHours: "9:30 AM - 6:30 PM, Monday to Friday",
+      //       noticePeriodProbation: "30 days",
+      //       noticePeriodConfirmed: "90 days",
+      //       leaveBreakup: "Casual: 7 | Sick: 7 | Paid: 15",
+      //     },
+      //   });
 
-    //   // console.log(ctcBreakup);
-    //   // Generate Offer Letter HTML
-    //   const html = offerLetterTemplate({
-    //     issueDate: new Date().toLocaleDateString("en-GB"),
-    //     joiningDate: formatDate(existingType.joiningDate),
-    //     employee: {
-    //       firstName: existingType.firstName,
-    //       lastName: existingType.lastName,
-    //       employeeId: existingType.empNo,
-    //       designation: existingType.designation,
-    //       department: existingType.department,
-    //       location: existingType.country || "India",
-    //       address: existingType.address,
-    //     },
-    //     salary: {
-    //       ctc: ctcBreakup.annualCTC,
-    //       monthly: ctcBreakup.components.monthly,
-    //       yearly: ctcBreakup.components.yearly,
-    //       probation: "6 Months",
-    //     },
-    //     policy: {
-    //       workHours: "9:30 AM - 6:30 PM, Monday to Friday",
-    //       noticePeriodProbation: "30 days",
-    //       noticePeriodConfirmed: "90 days",
-    //       leaveBreakup: "Casual: 7 | Sick: 7 | Paid: 15",
-    //     },
-    //   });
+      //   console.log(ctcBreakup);
 
-    //   console.log(ctcBreakup);
+      //   // Convert to PDF
+      //   const browser = await puppeteer.launch({ headless: "new" });
+      //   const page = await browser.newPage();
+      //   await page.setContent(html, { waitUntil: "networkidle0" });
+      //   const pdfBuffer = await page.pdf({
+      //     format: "A4",
+      //     printBackground: true,
+      //     margin: { top: "3mm", bottom: "3mm", left: "1mm", right: "1mm" },
+      //   });
+      //   await browser.close();
 
-    //   // Convert to PDF
-    //   const browser = await puppeteer.launch({ headless: "new" });
-    //   const page = await browser.newPage();
-    //   await page.setContent(html, { waitUntil: "networkidle0" });
-    //   const pdfBuffer = await page.pdf({
-    //     format: "A4",
-    //     printBackground: true,
-    //     margin: { top: "3mm", bottom: "3mm", left: "1mm", right: "1mm" },
-    //   });
-    //   await browser.close();
-
-    //   sendMailForEmployeeOfferLetter(company, existingType, pdfBuffer);
-    // }
-    await existingType.save();
+      //   sendMailForEmployeeOfferLetter(company, existingType, pdfBuffer);
+      // }
+      await existingType.save();
 
     // Update UserReporting if `reportedBy` changed
     if (reportedBy !== existingType.reportedBy) {
