@@ -1,4 +1,3 @@
-import { ConnectToDatabase } from "../db/db.js";
 import { Type, User, UserReporting } from "../Models/UserModel.js";
 import bcrypt from "bcrypt";
 import { getPresignedUrl } from "../storage/s3.config.js";
@@ -10,6 +9,21 @@ import {
   generatePFNo,
   generateUAN,
 } from "../common/employee.utilis.js";
+import { EmployeeAnnuallySalaryBreakup } from "../Models/payrollModel.js";
+import { calculateSalaryBreakup } from "../common/salaryBreakup.js";
+import { offerLetterTemplate } from "../common/offerLetterTemplate.js";
+import puppeteer from "puppeteer";
+import { imageToBase64 } from "../common/imageToBase64.js";
+import path from "path";
+import { sendMailForEmployeeOfferLetter } from "../mail/sendMailforOfferLetter.js";
+
+const companyLogo = imageToBase64(path.join("assets", "company-logo.png"));
+
+const company = {
+  name: "EMS AS IT Technologies Ltd",
+  address: "Powai Mumbai, Maharashtra 400001 India",
+  logo: companyLogo,
+};
 
 const CreateUser = async (req, res) => {
   try {
@@ -59,19 +73,6 @@ const CreateUser = async (req, res) => {
       });
     }
 
-    // // Find the last inserted employee sorted by empNo
-    // const lastEmp = await User.findOne()
-    //   .sort({ empNo: -1 })
-    //   .collation({ locale: "en_US", numericOrdering: true });
-
-    // let empNo = "EMP001";
-
-    // if (lastEmp && lastEmp.empNo) {
-    //   const lastNumber = parseInt(lastEmp.empNo.replace("EMP", ""));
-    //   const newNumber = lastNumber + 1;
-    //   empNo = `EMP${String(newNumber).padStart(3, "0")}`;
-    // }
-
     const empNo = await generateEmpNo(User);
 
     const password = "Admin@1234";
@@ -117,6 +118,67 @@ const CreateUser = async (req, res) => {
         reportedByEmployee: reportedByEmpID,
       });
     }
+
+    // Auto-generate salary breakup
+    if (newUser.salary) {
+      const breakup = calculateSalaryBreakup(newUser.salary);
+
+      await EmployeeAnnuallySalaryBreakup.create({
+        empNo: newUser.empNo,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        annualCTC: newUser.salary,
+        components: {
+          monthly: breakup.monthly,
+          yearly: breakup.yearly,
+        },
+      });
+    }
+
+    const ctcBreakup = await EmployeeAnnuallySalaryBreakup.findOne({
+      empNo: newUser.empNo,
+    });
+
+    // Generate Offer Letter HTML
+    const html = offerLetterTemplate({
+      issueDate: new Date().toLocaleDateString("en-GB"),
+      joiningDate: newUser.joiningDate,
+      employee: {
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        employeeId: newUser.empNo,
+        designation: newUser.designation,
+        department: newUser.department,
+        location: newUser.country || "India",
+        address: newUser.address,
+      },
+      salary: {
+        ctc: ctcBreakup.annualCTC,
+        monthly: ctcBreakup.components.monthly,
+        yearly: ctcBreakup.components.yearly,
+        probation: "6 Months",
+      },
+      policy: {
+        workHours: "9:30 AM - 6:30 PM, Monday to Friday",
+        noticePeriodProbation: "30 days",
+        noticePeriodConfirmed: "90 days",
+        leaveBreakup: "Casual: 7 | Sick: 7 | Paid: 15",
+      },
+    });
+    console.log(ctcBreakup);
+    // Convert to PDF
+    const browser = await puppeteer.launch({ headless: "new" });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "3mm", bottom: "3mm", left: "1mm", right: "1mm" },
+    });
+    await browser.close();
+
+    // Send Email with PDF
+    sendMailForEmployeeOfferLetter(company, existingType, pdfBuffer);
 
     res.status(201).json({
       status: "success",
@@ -253,12 +315,76 @@ const UpdateEmployeeList = async (req, res) => {
     existingType.workType = workType;
     existingType.profileImage = profileImage;
     // 🔹 Auto-generate Bank Details
-    (existingType.bankName = "ICICI BANK"),
-      (existingType.bankAccNo = generateBankAccNo()),
-      (existingType.pfNo = generatePFNo()),
-      (existingType.uan = generateUAN()),
-      (existingType.pan = generatePAN()),
-      await existingType.save();
+    // (existingType.bankName = "ICICI BANK"),
+    //   (existingType.bankAccNo = generateBankAccNo()),
+    //   (existingType.pfNo = generatePFNo()),
+    //   (existingType.uan = generateUAN()),
+    //   (existingType.pan = generatePAN()),
+
+    // if (salary) {
+    //   const breakup = calculateSalaryBreakup(salary);
+
+    //   console.log("Breakup---->", breakup);
+
+    //   await EmployeeAnnuallySalaryBreakup.create({
+    //     empNo: existingType.empNo,
+    //     firstName: existingType.firstName,
+    //     lastName: existingType.lastName,
+    //     annualCTC: existingType.salary,
+    //     components: {
+    //       monthly: breakup.monthly,
+    //       yearly: breakup.yearly,
+    //     },
+    //   });
+
+    //   const ctcBreakup = await EmployeeAnnuallySalaryBreakup.findOne({
+    //     empNo: existingType.empNo,
+    //   });
+
+    //   // console.log(ctcBreakup);
+    //   // Generate Offer Letter HTML
+    //   const html = offerLetterTemplate({
+    //     issueDate: new Date().toLocaleDateString("en-GB"),
+    //     joiningDate: formatDate(existingType.joiningDate),
+    //     employee: {
+    //       firstName: existingType.firstName,
+    //       lastName: existingType.lastName,
+    //       employeeId: existingType.empNo,
+    //       designation: existingType.designation,
+    //       department: existingType.department,
+    //       location: existingType.country || "India",
+    //       address: existingType.address,
+    //     },
+    //     salary: {
+    //       ctc: ctcBreakup.annualCTC,
+    //       monthly: ctcBreakup.components.monthly,
+    //       yearly: ctcBreakup.components.yearly,
+    //       probation: "6 Months",
+    //     },
+    //     policy: {
+    //       workHours: "9:30 AM - 6:30 PM, Monday to Friday",
+    //       noticePeriodProbation: "30 days",
+    //       noticePeriodConfirmed: "90 days",
+    //       leaveBreakup: "Casual: 7 | Sick: 7 | Paid: 15",
+    //     },
+    //   });
+
+    //   console.log(ctcBreakup);
+
+    //   // Convert to PDF
+    //   const browser = await puppeteer.launch({ headless: "new" });
+    //   const page = await browser.newPage();
+    //   await page.setContent(html, { waitUntil: "networkidle0" });
+    //   const pdfBuffer = await page.pdf({
+    //     format: "A4",
+    //     printBackground: true,
+    //     margin: { top: "3mm", bottom: "3mm", left: "1mm", right: "1mm" },
+    //   });
+    //   await browser.close();
+
+    //   sendMailForEmployeeOfferLetter(company, existingType, pdfBuffer);
+    // }
+    await existingType.save();
 
     // Update UserReporting if `reportedBy` changed
     if (reportedBy !== existingType.reportedBy) {
@@ -364,8 +490,6 @@ const CreateTypeList = async (req, res) => {
 const GetTypeList = async (req, res) => {
   try {
     const { entityValue, typeLabel, departmentType } = req.body;
-
-    // const query = entityValue ? { entityValue } : {};
 
     const query = {};
 

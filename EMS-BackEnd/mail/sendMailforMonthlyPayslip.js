@@ -53,7 +53,7 @@ const payslipEmailTemplate = ({ monthYear, employeeName, salary, leave }) => `
         <tr>
           <td style="padding:10px; border:1px solid #ddd;">Conveyance</td>
           <td style="padding:10px; border:1px solid #ddd; text-align:right;">${
-            salary.conveyance
+            salary.otherAllowance
           }</td>
         </tr>
         <tr>
@@ -69,7 +69,7 @@ const payslipEmailTemplate = ({ monthYear, employeeName, salary, leave }) => `
           }</td>
         </tr>
         <tr style="background:#f0f2f5; font-weight:bold;">
-          <td style="padding:10px; border:1px solid #ddd;">Leave Taken</td>
+          <td style="padding:10px; border:1px solid #ddd;">Available Leave</td>
           <td style="padding:10px; border:1px solid #ddd; text-align:right;">${
             leave.total
           }</td>

@@ -1,5 +1,3 @@
-// src/utils/currency.js
-
 // Format numbers in Indian locale and convert to words (INR)
 export const formatINR = (num) =>
   Number(num || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });

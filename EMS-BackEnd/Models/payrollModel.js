@@ -54,4 +54,37 @@ const PayslipSchema = new mongoose.Schema({
 
 const Payslip = mongoose.model("Payslip", PayslipSchema);
 
-export default Payslip;
+const salaryComponentSchema = new mongoose.Schema(
+  {
+    basic: { type: Number, default: 0 },
+    hra: { type: Number, default: 0 },
+    specialAllowance: { type: Number, default: 0 },
+    otherAllowance: { type: Number, default: 0 },
+    pf: { type: Number, default: 0 },
+    professionalTax: { type: Number, default: 0 },
+    gross: { type: Number, default: 0 },
+    totalDeductions: { type: Number, default: 0 },
+    net: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
+const employeeAnnuallySalaryBreakupSchema = new mongoose.Schema({
+  empNo: { type: String, required: true, index: true },
+  firstName: String,
+  lastName: String,
+  annualCTC: { type: Number, required: true },
+  components: {
+    monthly: salaryComponentSchema,
+    yearly: salaryComponentSchema,
+  },
+  createdAt: { type: Date, default: Date.now },
+  updateAt: { type: Date, default: Date.now },
+});
+
+const EmployeeAnnuallySalaryBreakup = mongoose.model(
+  "EmployeeAnnuallySalaryBreakup",
+  employeeAnnuallySalaryBreakupSchema
+);
+
+export { Payslip, EmployeeAnnuallySalaryBreakup };

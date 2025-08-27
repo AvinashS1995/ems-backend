@@ -1,4 +1,3 @@
-// src/cron/payrollCron.js
 import cron from "node-cron";
 import axios from "axios";
 import dotenv from "dotenv";
@@ -17,12 +16,11 @@ export const scheduleMonthlyPayslips = async (getEmployeeList) => {
       month: "long",
       year: "numeric",
     });
-    const employees = await User.find({ status: "Active" }); // e.g., () => User.find({ active: true })
+    const employees = await User.find({ status: "Active" });
     // console.log(employees);
     for (const e of employees) {
-      // Get salary breakup from your payroll logic/service
-      const salary = await buildSalaryFor(e, monthYear); // implement per your rules
-      const leave = await buildLeaveSummaryFor(e, monthYear); // implement
+      const salary = await buildSalaryFor(e, monthYear);
+      const leave = await buildLeaveSummaryFor(e, monthYear);
 
       await axios.post(
         `http://localhost:${process.env.PORT}/api/payroll/generate-employee-monthly-payslip`,
@@ -44,11 +42,11 @@ export const scheduleMonthlyPayslips = async (getEmployeeList) => {
   // });
 };
 
-// Dummy helpers to illustrate; replace with real logic.
+// Dummy helpers
 const buildSalaryFor = async (e, monthYear) => ({
   basic: 25000,
   hra: 11000,
-  conveyance: 1600,
+  otherAllowance: 1600,
   special: 4500,
   gross: 52850,
   pf: 3000,

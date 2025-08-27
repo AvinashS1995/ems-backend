@@ -1,10 +1,5 @@
-// src/templates/monthlyPayslipTemplate.js
-
 import { imageToBase64 } from "../common/imageToBase64.js";
 import path from "path";
-
-// NOTE: Keep HTML/CSS self-contained. Avoid loading external CSS to
-// ensure consistent rendering in Puppeteer. Images/Logos can be remote.
 
 const companyLogo = imageToBase64(path.join("assets", "company-logo.png"));
 const poweredByLogo = imageToBase64(path.join("assets", "powered-by.png"));
@@ -21,8 +16,6 @@ export const monthlyPayslipTemplate = ({
   salary,
   leave,
 }) => {
-  // salary, leave objects are expected to be NUMBERS already formatted if needed in controller
-  // employee: { firstName, lastName, employeeId, designation, department, location }
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
 
   return `<!DOCTYPE html>
@@ -187,17 +180,18 @@ export const monthlyPayslipTemplate = ({
 
   <table class="earnings">
     <tr><th>Earnings</th><th>Amount</th><th>Deductions</th><th>Amount</th></tr>
-    <tr><td>Basic</td><td>Rs.${salary.basic}</td><td>Income Tax</td><td>Rs.${
-    salary.tax
-  }</td></tr>
+    <tr><td>Basic</td><td>Rs.${
+      salary.basic
+    }</td><td>Provident Fund</td><td>Rs.${salary.pf}
+  </td></tr>
     <tr><td>House Rent Allowance</td><td>Rs.${
       salary.hra
-    }</td><td>Provident Fund</td><td>Rs.${salary.pf}</td></tr>
-    <tr><td>Conveyance</td><td>Rs.${
-      salary.conveyance
     }</td><td>Professional Tax</td><td>Rs.${salary.profTax}</td></tr>
     <tr><td>Special/Compensatory</td><td>Rs.${
       salary.special
+    }</td><td></td><td></td></tr>
+    <tr><td>Other Allowance</td><td>Rs.${
+      salary.otherAllowance
     }</td><td></td><td></td></tr>
     <tr><th>Gross Earnings</th><th>Rs.${
       salary.gross

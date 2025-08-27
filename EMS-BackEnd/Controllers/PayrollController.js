@@ -8,7 +8,10 @@ import { formatINR, numberToINRWords } from "../common/currency.js";
 import { getPresignedUrl, s3Client } from "../storage/s3.config.js";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import payslipEmailTemplate from "../mail/sendMailforMonthlyPayslip.js";
-import Payslip from "../Models/payrollModel.js";
+import {
+  EmployeeAnnuallySalaryBreakup,
+  Payslip,
+} from "../Models/payrollModel.js";
 import path from "path";
 import { Holidays } from "../Models/holidayModel.js";
 import Attendance from "../Models/attendenceModel.js";
@@ -17,20 +20,6 @@ dotenv.config({ path: "./.env" });
 
 const DEFAULT_AVATAR =
   "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png";
-
-// Leave types
-const PAID_LEAVE_TYPES = [
-  "Paid Leaves (PL)",
-  "Sick Leave (SL)",
-  "Casual Leave (CL)",
-  "Maternity Leave (ML)",
-  "Paternity Leave (PTL)",
-  "Bereavement Leave (BL)",
-  "Compensatory Off",
-  "Marriage Leave (MRL)",
-];
-
-const UNPAID_LEAVE_TYPES = ["Leave Without Pay (LWP)", "Absent"];
 
 // Check weekend
 const isWeekend = (date) => date.getDay() === 0 || date.getDay() === 6;
@@ -108,7 +97,6 @@ const getWorkingDaysBetween = async (startDate, endDate) => {
   return workingDays;
 };
 
-// --- Main Payslip Function ---
 export const createMonthlyPayslip = async (req, res) => {
   try {
     const { email, monthYear, salary: rawSalary } = req.body;
@@ -149,33 +137,49 @@ export const createMonthlyPayslip = async (req, res) => {
     const totalLopDays = lopDaysArr.length;
     const paidDays = totalPresentDays + totalPaidLeaveDays;
 
+    // --- Fetch salary breakup from DB  ---
+    const salaryBreakup = await EmployeeAnnuallySalaryBreakup.findOne({
+      empNo: user.empNo,
+    });
+
+    if (!salaryBreakup) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Salary breakup not found" });
+    }
+
+    const monthlySalary = salaryBreakup.components.monthly;
+
+    console.log(monthlySalary);
+
     // --- Pro-rate salary based on paid days ---
-    const perDayBasic = (rawSalary.basic || 0) / totalWorkingDays;
-    const perDayHRA = (rawSalary.hra || 0) / totalWorkingDays;
-    const perDayConveyance = (rawSalary.conveyance || 0) / totalWorkingDays;
-    const perDaySpecial = (rawSalary.special || 0) / totalWorkingDays;
+    const perDayBasic = (monthlySalary.basic || 0) / totalWorkingDays;
+    const perDayHRA = (monthlySalary.hra || 0) / totalWorkingDays;
+    const perDayOtherAllowance =
+      (monthlySalary.otherAllowance || 0) / totalWorkingDays;
+    const perDaySpecial =
+      (monthlySalary.specialAllowance || 0) / totalWorkingDays;
+
+    console.log(perDayBasic);
 
     const basic = perDayBasic * paidDays;
     const hra = perDayHRA * paidDays;
-    const conveyance = perDayConveyance * paidDays;
-    const special = perDaySpecial * paidDays;
+    const otherAllowance = perDayOtherAllowance * paidDays;
+    const specialAllowance = perDaySpecial * paidDays;
 
-    const gross = basic + hra + conveyance + special;
-    const totalDeductions =
-      parseFloat(rawSalary.pf || 0) +
-      parseFloat(rawSalary.profTax || 0) +
-      parseFloat(rawSalary.tax || 0);
-    const net = Math.max(0, gross - totalDeductions);
+    const gross = monthlySalary.gross * paidDays;
+
+    const totalDeductions = monthlySalary.totalDeductions;
+    const net = monthlySalary.net * paidDays;
 
     const salary = {
       basic: formatINR(basic),
       hra: formatINR(hra),
-      conveyance: formatINR(conveyance),
-      special: formatINR(special),
+      otherAllowance: formatINR(otherAllowance),
+      special: formatINR(specialAllowance),
       gross: formatINR(gross),
-      pf: formatINR(rawSalary.pf || 0),
-      profTax: formatINR(rawSalary.profTax || 0),
-      tax: formatINR(rawSalary.tax || 0),
+      pf: formatINR(monthlySalary.pf || 0),
+      profTax: formatINR(monthlySalary.professionalTax || 0),
       totalDeductions: formatINR(totalDeductions),
       net: formatINR(net),
       netInWords: numberToINRWords(net),
@@ -186,6 +190,7 @@ export const createMonthlyPayslip = async (req, res) => {
       paidDays,
     };
 
+    console.log(salary);
     const leave = {
       total: totalWorkingDays,
       taken: totalLopDays,
@@ -244,7 +249,6 @@ export const createMonthlyPayslip = async (req, res) => {
       leave,
     });
 
-    // --- Save to DB ---
     const payslipRecord = new Payslip({
       employeeId: employee.employeeId,
       email,
@@ -264,16 +268,16 @@ export const createMonthlyPayslip = async (req, res) => {
       earnings: [
         { label: "Basic", amount: basic },
         { label: "HRA", amount: hra },
-        { label: "Conveyance", amount: conveyance },
-        { label: "Special", amount: special },
+        { label: "Other Allowance", amount: otherAllowance },
+        { label: "Special", amount: specialAllowance },
       ],
       deductions: [
-        { label: "PF", amount: parseFloat(rawSalary.pf || 0) },
+        { label: "PF", amount: parseFloat(salary.pf || 0) },
         {
           label: "Professional Tax",
-          amount: parseFloat(rawSalary.profTax || 0),
+          amount: parseFloat(salary.profTax || 0),
         },
-        { label: "Income Tax", amount: parseFloat(rawSalary.tax || 0) },
+        { label: "Income Tax", amount: parseFloat(salary.tax || 0) },
       ],
       grossEarnings: gross,
       totalDeductions,
@@ -304,18 +308,15 @@ export const getAllEmployeeMonthlyPayslip = async (req, res) => {
 
     const filter = {};
 
-    // Case 2 & 3 → Month + Year (employee optional)
     if (month && year) {
       filter.periodMonth = parseInt(month);
       filter.periodYear = parseInt(year);
     }
 
-    // Case 3 & 4 → Employee (month/year optional)
     if (employeeId) {
       filter.employeeId = employeeId;
     }
 
-    // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const total = await Payslip.countDocuments(filter);
@@ -326,7 +327,6 @@ export const getAllEmployeeMonthlyPayslip = async (req, res) => {
       .limit(parseInt(limit))
       .lean();
 
-    // Enrich payslips with avatar + presigned URL
     const formattedPayslips = await Promise.all(
       payslips.map(async (p) => {
         let avatar = DEFAULT_AVATAR;

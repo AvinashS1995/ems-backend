@@ -413,21 +413,6 @@ const approveRejectLeave = async (req, res) => {
       leave.status = "Approved";
 
       if (applicant) {
-        // await Popup.create({
-        //   name: "Leave Approved",
-        //   startDate: new Date(),
-        //   endDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
-        //   startTime: "12:00 AM",
-        //   endTime: "11:59 PM",
-        //   country: applicant.country || "India",
-        //   role: applicant.role,
-        //   gender: applicant.gender,
-        //   employee: applicant.empNo,
-        //   popupType: "text",
-        //   textMessage: "Your leave has been approved.",
-        //   isActive: true,
-        // });
-
         await sendLeaveEmail({
           to: applicant.email,
           name: `${applicant.firstName} ${applicant.lastName}`,
@@ -450,7 +435,7 @@ const approveRejectLeave = async (req, res) => {
         leave.approvalStatus.push({
           role: nextPending.role,
           empNo: nextPending.empNo,
-          name: nextPending.name.split(" - ")[0], // clean name
+          name: nextPending.name.split(" - ")[0],
           status: "Pending",
           comments: null,
           actionDate: null,
@@ -504,7 +489,7 @@ const getAllLeaves = async (req, res) => {
   }
 };
 
-// 📌 Create leave balance (pro-rata calculation)
+// Create leave balance (pro-rata calculation)
 const createLeaveBalance = async (req, res) => {
   try {
     const { empNo, doj } = req.body;
@@ -559,7 +544,7 @@ const getLeaveBalance = async (req, res) => {
   }
 };
 
-// 📌 Update leave balance
+// Update leave balance
 const updateLeaveBalance = async (req, res) => {
   try {
     const { empNo, type, days } = req.body;
