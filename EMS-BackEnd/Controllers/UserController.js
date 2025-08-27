@@ -16,6 +16,7 @@ import puppeteer from "puppeteer";
 import { imageToBase64 } from "../common/imageToBase64.js";
 import path from "path";
 import { sendMailForEmployeeOfferLetter } from "../mail/sendMailforOfferLetter.js";
+import { formatDate } from "../common/dateFormat.js";
 
 const companyLogo = imageToBase64(path.join("assets", "company-logo.png"));
 
