@@ -161,14 +161,15 @@ export const offerLetterTemplate = ({
       <th>Annual</th>
       <th>Remarks</th>
     </tr>
-    <tr><td>Basic</td><td>${salary.monthly.basic}</td><td>${salary.yearly.basic}</td><td>40% of CTC (illustrative)</td></tr>
-    <tr><td>House Rent Allowance (HRA)</td><td>${salary.monthly.hra}</td><td>${salary.yearly.hra}</td><td>As per policy and tax rules</td></tr>
-    <tr><td>Special / Compensatory</td><td>${salary.monthly.specialAllowance}</td><td>${salary.yearly.specialAllowance}</td><td>Balances salary structure</td></tr>
-    <tr><td>Other Allowances</td><td>${salary.monthly.otherAllowance}</td><td>${salary.yearly.otherAllowance}</td><td>Meal/Travel/Telephone (if applicable)</td></tr>
-    <tr><td><strong>Gross Earnings</strong></td><td>${salary.monthly.gross}</td><td><strong>${salary.yearly.gross}</strong></td><td></td></tr>
-    <tr><td>Profident Fund</td><td>${salary.monthly.pf}</td><td>${salary.yearly.pf}</td><td>12% of Basic (as applicable)</td></tr>
-    <tr><td>Professional Tax</td><td>${salary.monthly.professionalTax}</td><td>${salary.yearly.professionalTax}</td><td>As per Payment of Gratuity Act</td></tr>
-    <tr><td><strong>Estimated Net (Annual)</strong></td><td>${salary.monthly.net}</td><td><strong>${salary.yearly.net}</strong></td><td>Subject to declarations/tax regime</td></tr>
+    <tr><td>Basic</td><td>${salary.monthly.basic}</td><td>${salary.yearly.basic}</td><td>Fixed base pay (40% of CTC)</td></tr>
+    <tr><td>House Rent Allowance (HRA)</td><td>${salary.monthly.hra}</td><td>${salary.yearly.hra}</td><td>Provided for rental/living expenses (tax exempt as per IT rules)</td></tr>
+    <tr><td>Special / Compensatory</td><td>${salary.monthly.specialAllowance}</td><td>${salary.yearly.specialAllowance}</td><td>Flexible component balancing the structure</td></tr>
+    <tr><td>Other Allowances</td><td>${salary.monthly.otherAllowance}</td><td>${salary.yearly.otherAllowance}</td><td>Meal, travel, telephone or company policy-based</td></tr>
+    <tr><td><strong>Gross Earnings</strong></td><td>${salary.monthly.gross}</td><td><strong>${salary.yearly.gross}</strong></td><td>Total before statutory deductions</td></tr>
+    <tr><td>Employee Profident Fund</td><td>${salary.monthly.pf}</td><td>${salary.yearly.pf}</td><td>12% of Basic; deducted from employee salary</td></tr>
+    <tr><td>Employer Provident Fund (EPF + EPS)</td><td>${salary.monthly.employerContribution.total}</td><td>${salary.yearly.employerContribution.total}</td><td>12% of Basic; contributed by company (part of CTC)</td></tr>
+    <tr><td>Professional Tax</td><td>${salary.monthly.professionalTax}</td><td>${salary.yearly.professionalTax}</td><td>As per state laws; deducted monthly</td></tr>
+    <tr><td><strong>Estimated Net (Annual)</strong></td><td>${salary.monthly.net}</td><td><strong>${salary.yearly.net}</strong></td><td>Take-home after statutory deductions</td></tr>
   </table>
   <p class="note">Exact figures will be computed in payroll based on statutory rules, tax regime opted, and proofs submitted by you.</p>
 
@@ -176,7 +177,8 @@ export const offerLetterTemplate = ({
   <ul>
     <li>Salary is paid monthly via bank transfer on or before the last working day.</li>
     <li>Approved reimbursements must be claimed with valid invoices within 60 days.</li>
-    <li>TDS will be deducted as per the Income Tax Act based on your chosen regime.</li>
+    <li>Deductions such as Provident Fund (Employee share), Professional Tax (if applicable), and TDS under the Income Tax Act will be made from your salary.</li>
+    <li>The Company separately contributes its Employer share of Provident Fund (EPF/EPS), which is not deducted from your salary but is included in the CTC as part of statutory benefits.</li>
   </ul>
 
   <div class="section-title">ANNEXURE B - Company Policies (Summary)</div>

@@ -17,6 +17,7 @@ import { imageToBase64 } from "../common/imageToBase64.js";
 import path from "path";
 import { sendMailForEmployeeOfferLetter } from "../mail/sendMailforOfferLetter.js";
 import { formatDate } from "../common/dateFormat.js";
+import { ROLE_ID } from "../common/constant.js";
 
 const companyLogo = imageToBase64(path.join("assets", "company-logo.png"));
 
@@ -66,6 +67,14 @@ const CreateUser = async (req, res) => {
       });
     }
 
+    // ✅ Check if role is valid
+    if (!ROLE_ID[role]) {
+      return res.status(400).json({
+        status: "fail",
+        message: `Invalid role: ${role}`,
+      });
+    }
+
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -91,6 +100,7 @@ const CreateUser = async (req, res) => {
       country,
       password: hashPassword,
       role,
+      roleId: ROLE_ID[role],
       mobile,
       status,
       type,
@@ -143,7 +153,7 @@ const CreateUser = async (req, res) => {
     // Generate Offer Letter HTML
     const html = offerLetterTemplate({
       issueDate: new Date().toLocaleDateString("en-GB"),
-      joiningDate: newUser.joiningDate,
+      joiningDate: formatDate(newUser.joiningDate),
       employee: {
         firstName: newUser.firstName,
         lastName: newUser.lastName,
@@ -179,7 +189,7 @@ const CreateUser = async (req, res) => {
     await browser.close();
 
     // Send Email with PDF
-    sendMailForEmployeeOfferLetter(company, existingType, pdfBuffer);
+    sendMailForEmployeeOfferLetter(company, newUser, pdfBuffer);
 
     res.status(201).json({
       status: "success",
@@ -307,6 +317,7 @@ const UpdateEmployeeList = async (req, res) => {
     existingType.email = email;
     existingType.mobile = mobile;
     existingType.role = role;
+    existingType.roleId = ROLE_ID[role];
     existingType.status = status;
     existingType.reportedBy = reportedBy;
     existingType.designation = designation;
@@ -326,16 +337,20 @@ const UpdateEmployeeList = async (req, res) => {
 
       console.log("Breakup---->", breakup);
 
-      await EmployeeAnnuallySalaryBreakup.create({
-        empNo: existingType.empNo,
-        firstName: existingType.firstName,
-        lastName: existingType.lastName,
-        annualCTC: existingType.salary,
-        components: {
-          monthly: breakup.monthly,
-          yearly: breakup.yearly,
+      await EmployeeAnnuallySalaryBreakup.findOneAndUpdate(
+        { empNo: existingType.empNo },
+        {
+          empNo: existingType.empNo,
+          firstName: existingType.firstName,
+          lastName: existingType.lastName,
+          annualCTC: existingType.salary,
+          components: {
+            monthly: breakup.monthly,
+            yearly: breakup.yearly,
+          },
         },
-      });
+        { new: true, upsert: true } // return updated doc, create if not exists
+      );
 
       const ctcBreakup = await EmployeeAnnuallySalaryBreakup.findOne({
         empNo: existingType.empNo,
@@ -596,6 +611,172 @@ const DeleteTypeList = async (req, res) => {
   }
 };
 
+const getManagerWiseTeamLeaders = async (req, res) => {
+  try {
+    const { empNo } = req.body;
+
+    // Find team leaders under this Manager
+    const reportingRecords = await UserReporting.find({
+      reportedByEmployee: empNo,
+    });
+
+    if (!reportingRecords.length) {
+      return res.status(404).json({
+        status: "fail",
+        message: "No Team Leaders found under this Manager",
+      });
+    }
+
+    const teamLeaderEmpNos = reportingRecords.map((r) => r.employee);
+    const teamLeaders = await User.find({
+      empNo: { $in: teamLeaderEmpNos },
+      role: "Team Leader",
+    });
+
+    // 🔹 Only return required fields
+    const formattedLeaders = teamLeaders.map((tl) => ({
+      empNo: tl.empNo,
+      name: `${tl.firstName} ${tl.lastName}`,
+      email: tl.email,
+      role: tl.role,
+      designation: tl.designation,
+    }));
+
+    res.status(200).json({
+      status: "success",
+      message: "Team Leaders fetched successfully",
+      data: {
+        formattedLeaders,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: "fail",
+      message: err.message,
+    });
+  }
+};
+
+const getTeamLeaderWiseEmployees = async (req, res) => {
+  try {
+    const { empNo } = req.body;
+
+    // Find employees under this Team Leader
+    const reportingRecords = await UserReporting.find({
+      reportedByEmployee: empNo,
+    });
+
+    if (!reportingRecords.length) {
+      return res.status(404).json({
+        status: "fail",
+        message: "No Employees found under this Team Leader",
+      });
+    }
+
+    // Get User details for those employees
+    const employeeEmpNos = reportingRecords.map((r) => r.employee);
+    const employees = await User.find({
+      empNo: { $in: employeeEmpNos },
+      role: "Employee",
+    });
+
+    // 🔹 Only return required fields
+    const formattedEmployees = employees.map((e) => ({
+      empNo: e.empNo,
+      name: `${e.firstName} ${e.lastName}`,
+      email: e.email,
+      role: e.role,
+      designation: e.designation,
+    }));
+
+    res.status(200).json({
+      status: "success",
+      message: "Employees fetched successfully",
+      data: {
+        formattedEmployees,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: "fail",
+      message: err.message,
+    });
+  }
+};
+
+const getManagerWiseTeamLeaderWithEmployees = async (req, res) => {
+  try {
+    const { empNo } = req.body;
+
+    const tlReportingRecords = await UserReporting.find({
+      reportedByEmployee: empNo,
+    });
+
+    console.log(tlReportingRecords);
+
+    if (!tlReportingRecords.length) {
+      return res.status(404).json({
+        status: "fail",
+        message: "No Team Leaders found under this Manager",
+      });
+    }
+
+    const teamLeaderEmpNos = tlReportingRecords.map((r) => r.employee);
+
+    const teamLeaders = await User.find({
+      empNo: { $in: teamLeaderEmpNos },
+      role: "Team Leader",
+    });
+
+    const result = await Promise.all(
+      teamLeaders.map(async (tl) => {
+        const empReporting = await UserReporting.find({
+          reportedByEmployee: tl.empNo,
+        });
+
+        const empNos = empReporting.map((r) => r.employee);
+        const employees = await User.find({
+          empNo: { $in: empNos },
+          role: "Employee",
+        });
+
+        return {
+          teamLeader: {
+            empNo: tl.empNo,
+            name: `${tl.firstName} ${tl.lastName}`,
+            email: tl.email,
+            role: tl.role,
+            designation: tl.designation,
+          },
+          employees: employees.map((e) => ({
+            empNo: e.empNo,
+            name: `${e.firstName} ${e.lastName}`,
+            email: e.email,
+            role: e.role,
+            designation: e.designation,
+          })),
+        };
+      })
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        manager: empNo,
+        teamLeaders: result,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Error in getManagerWiseTeamLeaderWithEmployees:", err);
+    res.status(500).json({
+      status: "fail",
+      message: err.message,
+    });
+  }
+};
+
 export {
   CreateUser,
   GetUserList,
@@ -605,4 +786,7 @@ export {
   GetTypeList,
   UpdateTypeList,
   DeleteTypeList,
+  getManagerWiseTeamLeaders,
+  getTeamLeaderWiseEmployees,
+  getManagerWiseTeamLeaderWithEmployees,
 };

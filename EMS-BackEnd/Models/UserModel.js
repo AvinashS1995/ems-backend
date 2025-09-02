@@ -48,6 +48,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, "Role is requied field"],
   },
+  roleId: {
+    type: Number,
+  },
+
   type: {
     type: String,
     required: [true, "Type is requied field"],

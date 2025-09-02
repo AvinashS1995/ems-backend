@@ -54,6 +54,15 @@ const PayslipSchema = new mongoose.Schema({
 
 const Payslip = mongoose.model("Payslip", PayslipSchema);
 
+const employerContributionSchema = new mongoose.Schema(
+  {
+    epf: { type: Number, default: 0 },
+    eps: { type: Number, default: 0 },
+    total: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 const salaryComponentSchema = new mongoose.Schema(
   {
     basic: { type: Number, default: 0 },
@@ -65,6 +74,7 @@ const salaryComponentSchema = new mongoose.Schema(
     gross: { type: Number, default: 0 },
     totalDeductions: { type: Number, default: 0 },
     net: { type: Number, default: 0 },
+    employerContribution: employerContributionSchema,
   },
   { _id: false }
 );

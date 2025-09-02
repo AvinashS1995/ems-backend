@@ -1,9 +1,28 @@
-import express from 'express';
-import { Login, LogOut, resendOtp, resetPassword, sendOtp, VerifyEmail, verifyOtp } from '../Controllers/LoginController.js';
-import { CreateUser, CreateTypeList, GetTypeList, UpdateTypeList, DeleteTypeList, GetUserList, UpdateEmployeeList, DeleteEmployeeList } from '../Controllers/UserController.js';
-import upload from '../Middlewares/uploadMiddleware.js';
-import { authenticateToken } from '../Middlewares/verifyTokenMiddleware.js';
-
+import express from "express";
+import {
+  Login,
+  LogOut,
+  resendOtp,
+  resetPassword,
+  sendOtp,
+  VerifyEmail,
+  verifyOtp,
+} from "../Controllers/LoginController.js";
+import {
+  CreateUser,
+  CreateTypeList,
+  GetTypeList,
+  UpdateTypeList,
+  DeleteTypeList,
+  GetUserList,
+  UpdateEmployeeList,
+  DeleteEmployeeList,
+  getManagerWiseTeamLeaderWithEmployees,
+  getManagerWiseTeamLeaders,
+  getTeamLeaderWiseEmployees,
+} from "../Controllers/UserController.js";
+import upload from "../Middlewares/uploadMiddleware.js";
+import { authenticateToken } from "../Middlewares/verifyTokenMiddleware.js";
 
 const router = express.Router();
 /**
@@ -66,7 +85,12 @@ const router = express.Router();
  *       500:
  *         description: Server error
  */
-router.post('/register-user', authenticateToken, upload.single("profileImage") ,CreateUser)
+router.post(
+  "/register-user",
+  authenticateToken,
+  upload.single("profileImage"),
+  CreateUser
+);
 /**
  * @swagger
  * /api/auth/login:
@@ -93,7 +117,7 @@ router.post('/register-user', authenticateToken, upload.single("profileImage") ,
  *       500:
  *         description: Server error
  */
-router.post('/login', Login);
+router.post("/login", Login);
 /**
  * @swagger
  * /api/auth/verify-email:
@@ -118,7 +142,7 @@ router.post('/login', Login);
  *       500:
  *         description: Server error
  */
-router.post('/verify-email', VerifyEmail);
+router.post("/verify-email", VerifyEmail);
 /**
  * @swagger
  * /api/auth/send-otp:
@@ -143,7 +167,7 @@ router.post('/verify-email', VerifyEmail);
  *       500:
  *         description: Server error
  */
-router.post('/send-otp', sendOtp);
+router.post("/send-otp", sendOtp);
 /**
  * @swagger
  * /api/auth/resend-otp:
@@ -168,7 +192,7 @@ router.post('/send-otp', sendOtp);
  *       500:
  *         description: Server error
  */
-router.post('/resend-otp', resendOtp)
+router.post("/resend-otp", resendOtp);
 /**
  * @swagger
  * /api/auth/verify-otp:
@@ -195,12 +219,12 @@ router.post('/resend-otp', resendOtp)
  *       500:
  *         description: Server error
  */
-router.post('/verify-otp', verifyOtp)
+router.post("/verify-otp", verifyOtp);
 /**
  * @swagger
  * /api/auth/reset-password:
  *   post:
- *     summary: Reset User password 
+ *     summary: Reset User password
  *     tags:
  *       - Login
  *     requestBody:
@@ -224,12 +248,12 @@ router.post('/verify-otp', verifyOtp)
  *       500:
  *         description: Server error
  */
-router.post('/reset-password', resetPassword)
+router.post("/reset-password", resetPassword);
 /**
  * @swagger
  * /api/auth/log-out:
  *   post:
- *     summary: Log Out User 
+ *     summary: Log Out User
  *     tags:
  *       - Login
  *     responses:
@@ -240,12 +264,12 @@ router.post('/reset-password', resetPassword)
  *       500:
  *         description: Server error
  */
-router.post('/log-out', LogOut)
+router.post("/log-out", LogOut);
 /**
  * @swagger
  * /api/auth/get-user-list:
  *   post:
- *     summary: All Employee List 
+ *     summary: All Employee List
  *     tags:
  *       - User
  *     requestBody:
@@ -271,7 +295,7 @@ router.post('/log-out', LogOut)
  *       500:
  *         description: Server error
  */
-router.post('/get-user-list', GetUserList)
+router.post("/get-user-list", GetUserList);
 /**
  * @swagger
  * /api/auth/update-employee-list:
@@ -317,7 +341,7 @@ router.post('/get-user-list', GetUserList)
  *       500:
  *         description: Server error
  */
-router.post('/update-employee-list', authenticateToken, UpdateEmployeeList)
+router.post("/update-employee-list", authenticateToken, UpdateEmployeeList);
 /**
  * @swagger
  * /api/auth/delete-employee-list:
@@ -342,7 +366,7 @@ router.post('/update-employee-list', authenticateToken, UpdateEmployeeList)
  *       500:
  *         description: Server error
  */
-router.post('/delete-employee-list', authenticateToken, DeleteEmployeeList)
+router.post("/delete-employee-list", authenticateToken, DeleteEmployeeList);
 /**
  * @swagger
  * /api/auth/save-type-list:
@@ -371,7 +395,7 @@ router.post('/delete-employee-list', authenticateToken, DeleteEmployeeList)
  *       500:
  *         description: Server error
  */
-router.post('/save-type-list', authenticateToken, CreateTypeList)
+router.post("/save-type-list", authenticateToken, CreateTypeList);
 /**
  * @swagger
  * /api/auth/get-type-list:
@@ -400,7 +424,7 @@ router.post('/save-type-list', authenticateToken, CreateTypeList)
  *       500:
  *         description: Server error
  */
-router.post('/get-type-list', authenticateToken, GetTypeList)
+router.post("/get-type-list", authenticateToken, GetTypeList);
 /**
  * @swagger
  * /api/auth/update-type-list:
@@ -433,7 +457,7 @@ router.post('/get-type-list', authenticateToken, GetTypeList)
  *       500:
  *         description: Server error
  */
-router.post('/update-type-list', authenticateToken, UpdateTypeList)
+router.post("/update-type-list", authenticateToken, UpdateTypeList);
 /**
  * @swagger
  * /api/auth/delete-type-list:
@@ -458,7 +482,86 @@ router.post('/update-type-list', authenticateToken, UpdateTypeList)
  *       500:
  *         description: Server error
  */
-router.post('/delete-type-list', authenticateToken, DeleteTypeList)
+router.post("/delete-type-list", authenticateToken, DeleteTypeList);
 
+/**
+ * @swagger
+ * /api/auth/get-manager-wise-team-leaders:
+ *   post:
+ *     summary: Get all Team Leaders under a specific Manager
+ *     tags: [User]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               empNo:
+ *                 type: string
+ *                 description: Employee number of the Manager
+ *     responses:
+ *       200:
+ *         description: Team Leaders fetched successfully
+ *       404:
+ *         description: No Team Leaders found
+ *       500:
+ *         description: Internal server error
+ */
+router.post("/get-manager-wise-team-leaders", getManagerWiseTeamLeaders);
+
+/**
+ * @swagger
+ * /api/auth/get-team-leader-wise-employees:
+ *   post:
+ *     summary: Get all Employees under a specific Team Leader
+ *     tags: [User]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               empNo:
+ *                 type: string
+ *                 description: Employee number of the Team Leader
+ *     responses:
+ *       200:
+ *         description: Employees fetched successfully
+ *       404:
+ *         description: No Employees found
+ *       500:
+ *         description: Internal server error
+ */
+router.post("/get-team-leader-wise-employees", getTeamLeaderWiseEmployees);
+
+/**
+ * @swagger
+ * /api/auth/get-manager-wise-teamleader-with-employees:
+ *   post:
+ *     summary: Get Team Leaders and their Employees under a Manager
+ *     tags: [User]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               empNo:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Successfully fetched Team Leaders with their Employees
+ *       404:
+ *         description: No Team Leaders or Employees found under this Manager
+ *       500:
+ *         description: Internal server error
+ */
+router.post(
+  "/get-manager-wise-teamleader-with-employees",
+  getManagerWiseTeamLeaderWithEmployees
+);
 
 export default router;

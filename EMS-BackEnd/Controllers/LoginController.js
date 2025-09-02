@@ -58,6 +58,7 @@ const Login = async (req, res) => {
         address: user.address,
         country: user.country,
         role: user.role,
+        roleId: user.roleId,
         type: user.type,
         status: user.status,
         reportedBy: user.reportedBy,
