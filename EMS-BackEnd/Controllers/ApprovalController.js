@@ -1,11 +1,12 @@
-import { Approval } from "../Models/approvalModel.js";
+import modelMap from "../common/allModels.js";
+import { ApprovalFlow } from "../Models/approvalModel.js";
 import mongoose from "mongoose";
 
 const saveApprovalDetails = async (req, res) => {
   try {
-    const { type, typeName, listApprovalFlowDetails } = req.body;
+    const { type, typeName, displayName, listApprovalFlowDetails } = req.body;
 
-    const exists = await Approval.findOne({ type }).lean();
+    const exists = await ApprovalFlow.findOne({ type }).lean();
 
     if (exists) {
       return res.status(400).json({
@@ -14,9 +15,10 @@ const saveApprovalDetails = async (req, res) => {
       });
     }
 
-    const newApproval = new Approval({
+    const newApproval = new ApprovalFlow({
       type,
       typeName,
+      displayName,
       listApprovalFlowDetails,
     });
 
@@ -44,7 +46,9 @@ const getAllApprovalDetails = async (req, res) => {
       query.typeName = typeName;
     }
 
-    const approvals = await Approval.find(query).sort({ createdAt: -1 }).lean();
+    const approvals = await ApprovalFlow.find(query)
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.status(200).json({
       status: "success",
@@ -62,13 +66,15 @@ const getAllApprovalDetails = async (req, res) => {
 
 const updateApprovalDetails = async (req, res) => {
   try {
-    const { id, type, typeName, listApprovalFlowDetails } = req.body;
+    const { id, type, typeName, displayName, listApprovalFlowDetails } =
+      req.body;
 
-    const updatedApproval = await Approval.findByIdAndUpdate(
+    const updatedApproval = await ApprovalFlow.findByIdAndUpdate(
       id,
       {
         type,
         typeName,
+        displayName,
         listApprovalFlowDetails,
       },
       { new: true, runValidators: true }
@@ -100,7 +106,7 @@ const deleteApprovalDetails = async (req, res) => {
   try {
     const { id } = req.body;
 
-    const deletedApproval = await Approval.findByIdAndDelete(id);
+    const deletedApproval = await ApprovalFlow.findByIdAndDelete(id);
 
     if (!deletedApproval) {
       return res.status(404).json({
@@ -132,11 +138,11 @@ const getEmpApprovalList = async (req, res) => {
       });
     }
 
-    const approvals = await Approval.find({}).lean();
+    const approvals = await ApprovalFlow.find({}).lean();
     const approvalList = [];
 
     for (const approval of approvals) {
-      const { type, typeName } = approval;
+      const { type, typeName, displayName } = approval;
 
       let count = 0;
 
@@ -144,6 +150,7 @@ const getEmpApprovalList = async (req, res) => {
         const Model = mongoose.model(typeName);
 
         count = await Model.countDocuments({
+          approvalFlowId: approval._id,
           approvalStatus: {
             $elemMatch: {
               empNo: approverEmpNo,
@@ -153,11 +160,13 @@ const getEmpApprovalList = async (req, res) => {
         });
       } catch (err) {
         console.warn(`Model not found for typeName: ${typeName}`);
+        console.log(err);
       }
       if (count > 0) {
         approvalList.push({
           applicationType: type,
           applicationTypeName: typeName,
+          applicationDisplayName: displayName,
           typeCount: count,
         });
       }
@@ -168,7 +177,7 @@ const getEmpApprovalList = async (req, res) => {
       message: "Record(s) Fetched Successfully!",
       totalRecords: approvalList.length,
       data: {
-        approvalList
+        approvalList,
       },
     });
   } catch (error) {
@@ -180,10 +189,37 @@ const getEmpApprovalList = async (req, res) => {
   }
 };
 
+const getAllModels = async (req, res) => {
+  try {
+    const models = Object.keys(modelMap);
+
+    const modelList = models.map((name, index) => ({
+      id: index + 1,
+      modelName: name,
+    }));
+
+    return res.status(200).json({
+      status: "success",
+      message: "Record(s) Successfully Fetched",
+      totalRecords: modelList.length,
+      data: {
+        models: modelList,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching models:", error);
+    return res.status(500).json({
+      status: "fail",
+      message: "Server error",
+    });
+  }
+};
+
 export {
   saveApprovalDetails,
   getAllApprovalDetails,
   updateApprovalDetails,
   deleteApprovalDetails,
   getEmpApprovalList,
+  getAllModels,
 };

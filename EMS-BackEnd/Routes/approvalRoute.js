@@ -1,10 +1,14 @@
-import express from 'express';
-import { deleteApprovalDetails, getAllApprovalDetails, getEmpApprovalList, saveApprovalDetails, updateApprovalDetails } from '../Controllers/ApprovalController.js';
-
+import express from "express";
+import {
+  deleteApprovalDetails,
+  getAllApprovalDetails,
+  getAllModels,
+  getEmpApprovalList,
+  saveApprovalDetails,
+  updateApprovalDetails,
+} from "../Controllers/ApprovalController.js";
 
 const router = express.Router();
-
-
 
 /**
  * @swagger
@@ -41,7 +45,7 @@ const router = express.Router();
  *       500:
  *         description: Server error
  */
-router.post('/save-approval-configuration-details', saveApprovalDetails)
+router.post("/save-approval-configuration-details", saveApprovalDetails);
 /**
  * @swagger
  * /api/approval/get-all-approval-configuration-details:
@@ -66,7 +70,7 @@ router.post('/save-approval-configuration-details', saveApprovalDetails)
  *       500:
  *         description: Server error
  */
-router.post('/get-all-approval-configuration-details', getAllApprovalDetails)
+router.post("/get-all-approval-configuration-details", getAllApprovalDetails);
 /**
  * @swagger
  * /api/approval/update-approval-configuration-detail:
@@ -104,7 +108,7 @@ router.post('/get-all-approval-configuration-details', getAllApprovalDetails)
  *       500:
  *         description: Server error
  */
-router.post('/update-approval-configuration-detail', updateApprovalDetails)
+router.post("/update-approval-configuration-detail", updateApprovalDetails);
 /**
  * @swagger
  * /api/approval/delete-approval-configuration-detail:
@@ -129,14 +133,14 @@ router.post('/update-approval-configuration-detail', updateApprovalDetails)
  *       500:
  *         description: Server error
  */
-router.post('/delete-approval-configuration-detail', deleteApprovalDetails)
+router.post("/delete-approval-configuration-detail", deleteApprovalDetails);
 /**
  * @swagger
  * /api/approval/get-employee-approval-request-list:
  *   post:
  *     summary: Get All Employee Approval Request List
  *     tags:
-  *       - Approval
+ *       - Approval
  *     requestBody:
  *       required: true
  *       content:
@@ -154,6 +158,22 @@ router.post('/delete-approval-configuration-detail', deleteApprovalDetails)
  *       500:
  *         description: Server error
  */
-router.post('/get-employee-approval-request-list', getEmpApprovalList)
+router.post("/get-employee-approval-request-list", getEmpApprovalList);
+/**
+ * @swagger
+ * /api/approval/get-all-models:
+ *   post:
+ *     summary: Get All Models in Our Projects
+ *     tags:
+ *       - Approval
+ *     responses:
+ *       200:
+ *         description: Record(s) successfully Fetched
+ *       400:
+ *         description: Bad request or missing required fields
+ *       500:
+ *         description: Server error
+ */
+router.post("/get-all-models", getAllModels);
 
 export default router;

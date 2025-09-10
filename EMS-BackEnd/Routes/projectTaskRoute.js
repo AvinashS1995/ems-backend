@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  approveRejectProject,
   createProject,
   createTask,
   getProjects,
@@ -183,7 +184,7 @@ router.post("/update-task-status", updateTaskStatus);
 /**
  * @swagger
  * /api/project/projects:
- *   get:
+ *   post:
  *     summary: Get all projects (role-based filtering can be applied in backend)
  *     tags: [Projects]
  *     responses:
@@ -193,6 +194,37 @@ router.post("/update-task-status", updateTaskStatus);
  *         description: Internal server error
  */
 router.post("/projects", getProjects);
+/**
+ * @swagger
+ * /api/project/project-assign-approve-reject:
+ *   post:
+ *     summary: Project Assign Approve Reject
+ *     tags:
+ *       - Project
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               projectId:
+ *                 type: string
+ *               action:
+ *                 type: string
+ *               comments:
+ *                 type: string
+ *               approverEmpNo:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Project Assign Approve Reject successfully !
+ *       400:
+ *         description: Bad request or missing required fields
+ *       500:
+ *         description: Server error
+ */
+router.post("/project-assign-approve-reject", approveRejectProject);
 
 /**
  * @swagger

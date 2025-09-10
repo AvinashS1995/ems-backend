@@ -93,6 +93,21 @@ const ProjectSchema = new mongoose.Schema({
     role: String,
   },
   tasks: [TaskSchema],
+  status: {
+    type: String,
+  },
+  approvalFlowId: { type: mongoose.Schema.Types.ObjectId, ref: "ApprovalFlow" },
+  approvalStatus: [
+    {
+      role: String,
+      empNo: String,
+      name: String,
+      status: String, // Pending, Approved, Submitted, Rejected
+      comments: String,
+      actionDate: String,
+    },
+  ],
+
   createAt: { type: Date, default: Date.now },
   updateAt: { type: Date, default: Date.now },
 });

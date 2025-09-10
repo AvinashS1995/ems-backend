@@ -1,5 +1,5 @@
 import { getApprovalStepEmployees } from "../common/employee.utilis.js";
-import { Approval } from "../Models/approvalModel.js";
+import { ApprovalFlow } from "../Models/approvalModel.js";
 import { Holidays } from "../Models/holidayModel.js";
 import { Leave, LeaveBalance } from "../Models/leaveModel.js";
 import { User } from "../Models/UserModel.js";
@@ -126,7 +126,7 @@ const saveEmployeeLeave = async (req, res) => {
     }
 
     // 3. Fetch approval flow
-    const approvalFlow = await Approval.findOne({ typeName });
+    const approvalFlow = await ApprovalFlow.findOne({ typeName });
     if (!approvalFlow) {
       return res.status(404).json({
         status: "fail",
@@ -234,7 +234,7 @@ const approvalFlow = async (req, res) => {
       });
     }
 
-    const approvalFlow = await Approval.findOne({ typeName });
+    const approvalFlow = await ApprovalFlow.findOne({ typeName });
     console.log(approvalFlow);
     if (!approvalFlow) {
       return res
@@ -349,7 +349,7 @@ const approveRejectLeave = async (req, res) => {
     });
 
     const typeName = typeMap[leave.leaveType];
-    const approvalFlow = await Approval.findOne({ typeName });
+    const approvalFlow = await ApprovalFlow.findOne({ typeName });
     const flowSteps = approvalFlow?.listApprovalFlowDetails || [];
 
     // Get stepper

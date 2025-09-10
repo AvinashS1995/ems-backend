@@ -1,5 +1,12 @@
 import { generateId } from "../common/common.js";
+import { getApprovalStepManagetToEmployees } from "../common/employee.utilis.js";
+import { ApprovalFlow } from "../Models/approvalModel.js";
 import { Projects } from "../Models/projectTaskModel.js";
+import { User } from "../Models/UserModel.js";
+
+const typeMap = {
+  "Project Assign Request": "Projects",
+};
 
 export const createProject = async (req, res) => {
   try {
@@ -22,7 +29,75 @@ export const createProject = async (req, res) => {
       });
     }
 
+    // 1. Fetch creator & TL user info
+    const creator = await User.findOne({ empNo: createdBy.empNo });
+    const teamLeader = await User.findOne({ empNo: assignTo.empNo });
+
+    if (!creator || !teamLeader) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Creator or Team Leader not found",
+      });
+    }
+
     const projectId = await generateId(Projects, "PRJ", "projectId");
+
+    const modelName = "Projects"; // registered mongoose model
+    const displayName = "Project Assign Request";
+    // console.log(typeName);
+
+    // 3. Fetch Approval flow (Project Assign Request)
+    const approvalFlow = await ApprovalFlow.findOne({
+      typeName: "Projects",
+      displayName: "Project Assign Request",
+    });
+    console.log(approvalFlow);
+    if (!approvalFlow) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Approval flow not found for Project Assign Request",
+      });
+    }
+
+    // 4. Initial status = Submitted by Manager
+    const initialStatus = [
+      {
+        role: creator.role,
+        empNo: creator.empNo,
+        name: `${creator.firstName} ${creator.lastName}`,
+        status: "Submitted",
+        comments: null,
+        actionDate: new Date(),
+      },
+    ];
+
+    // Stepper data (exclude applicant role)
+    let stepperData = await getApprovalStepManagetToEmployees(
+      creator.empNo,
+      approvalFlow.listApprovalFlowDetails,
+      initialStatus,
+      creator.role
+    );
+
+    console.log(stepperData);
+
+    // 🔑 Filter out duplicate applicant
+    stepperData = stepperData.filter((step) => step.role !== creator.role);
+
+    const approvalStatus = [
+      ...initialStatus,
+      ...stepperData.map((step) => ({
+        role: step.role,
+        empNo: step.empNo,
+        name: step.name.split(" - ")[0],
+        status: step.status || "Pending",
+        comments: step.comments || null,
+        actionDate: step.actionDate || null,
+      })),
+    ];
+
+    const pendingStep = approvalStatus.find((s) => s.status === "Pending");
+    const status = pendingStep ? `Pending for ${pendingStep.role}` : "Approved";
 
     const newProject = new Projects({
       projectId,
@@ -35,6 +110,10 @@ export const createProject = async (req, res) => {
       milestones,
       createdBy,
       assignTo,
+      status,
+      type: approvalFlow.type,
+      approvalFlowId: approvalFlow._id,
+      approvalStatus,
     });
 
     await newProject.save();
@@ -49,6 +128,129 @@ export const createProject = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+    res.status(500).json({ status: "fail", message: error.message });
+  }
+};
+
+export const approveRejectProject = async (req, res) => {
+  try {
+    const { projectId, action, comments, approverEmpNo } = req.body;
+
+    const project = await Projects.findOne({ projectId });
+    if (!project) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Project not found" });
+    }
+
+    const approver = await User.findOne({ empNo: approverEmpNo });
+    if (!approver) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Approver not found" });
+    }
+
+    const role = approver.role;
+
+    // Prevent duplicate action
+    const alreadyActed = project.approvalStatus.find(
+      (step) =>
+        step.empNo === approverEmpNo &&
+        step.role === role &&
+        step.status !== "Pending"
+    );
+    if (alreadyActed) {
+      return res
+        .status(400)
+        .json({ status: "fail", message: "You have already taken action" });
+    }
+
+    // Remove old pending entry
+    project.approvalStatus = project.approvalStatus.filter(
+      (s) =>
+        !(
+          s.empNo === approverEmpNo &&
+          s.role === role &&
+          s.status === "Pending"
+        )
+    );
+
+    // Add current approver action
+    project.approvalStatus.push({
+      role,
+      empNo: approverEmpNo,
+      name: `${approver.firstName} ${approver.lastName}`,
+      status: action === "Approved" ? "Approved" : "Rejected",
+      comments,
+      actionDate: new Date(),
+    });
+
+    // Fetch flow for Project Assign Request
+    const approvalFlow = await ApprovalFlow.findOne({
+      typeName: "Project Assign Request",
+    });
+    const flowSteps = approvalFlow?.listApprovalFlowDetails || [];
+
+    const stepperData = await getApprovalStepManagetToEmployees(
+      project.createdBy.empNo,
+      flowSteps,
+      project.approvalStatus,
+      approver.role
+    );
+
+    const nextPending = stepperData.find((step) => step.status === "Pending");
+
+    if (action === "Rejected") {
+      project.status = `Rejected by ${role}`;
+    } else if (!nextPending) {
+      project.status = "Approved";
+    } else {
+      project.status = `Pending for ${nextPending.role}`;
+      project.approvalStatus.push({
+        role: nextPending.role,
+        empNo: nextPending.empNo,
+        name: nextPending.name.split(" - ")[0],
+        status: "Pending",
+        comments: null,
+        actionDate: null,
+      });
+    }
+
+    project.updatedBy = approverEmpNo;
+    project.updateAt = new Date();
+
+    const updatedProject = await project.save();
+
+    res.status(200).json({
+      status: "success",
+      message: `Project ${action}ed successfully`,
+      data: updatedProject,
+    });
+  } catch (error) {
+    console.error("Error in approveRejectProject:", error);
+    res.status(500).json({ status: "fail", message: error.message });
+  }
+};
+
+export const ProjectRequestList = async (req, res) => {
+  try {
+    const { approverEmpNo } = req.body;
+
+    const projects = await Projects.find({
+      approvalStatus: {
+        $elemMatch: { empNo: approverEmpNo, status: "Pending" },
+      },
+    }).sort({ createAt: -1 });
+
+    res.status(200).json({
+      status: "success",
+      message: "Record(s) Fetched Successfully!",
+      data: {
+        projects,
+        totalRecords: projects.length,
+      },
+    });
+  } catch (error) {
     res.status(500).json({ status: "fail", message: error.message });
   }
 };
