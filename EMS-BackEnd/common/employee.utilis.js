@@ -210,9 +210,81 @@ const getApprovalStepManagetToEmployees = async (
   return result;
 };
 
+const getApprovalTemLeaderToEmployees = async (
+  employeeID,
+  flow,
+  approvalStatus = [],
+  applicantRole
+) => {
+  const result = [];
+  let pendingEncountered = false;
+
+  // Find index of applicant role in flow (to know where to start)
+  const applicantIndex = flow.findIndex((f) => f.role === applicantRole);
+
+  // Loop ONLY from applicant onwards
+  for (let i = applicantIndex; i < flow.length; i++) {
+    const roleStep = flow[i];
+    let foundEmp = null;
+
+    // If current role is applicant → skip (since already Submitted)
+    if (i === applicantIndex) {
+      const applicant = await User.findOne({ empNo: employeeID });
+      if (applicant) {
+        result.push({
+          role: applicant.role,
+          empNo: applicant.empNo,
+          name: `${applicant.firstName} ${applicant.lastName}`,
+          status: "Submitted",
+          comments: null,
+          actionDate: new Date(),
+        });
+      }
+      continue;
+    }
+
+    // Otherwise find next approver
+    const query = { role: roleStep.role };
+    if (roleStep.department) query.department = roleStep.department;
+    foundEmp = await User.findOne(query);
+
+    if (!foundEmp) break;
+
+    // Check if already acted
+    const statusEntry = approvalStatus.find(
+      (s) => s.empNo === foundEmp.empNo && s.role === roleStep.role
+    );
+
+    const baseEntry = {
+      role: roleStep.role,
+      empNo: foundEmp.empNo,
+      name: `${foundEmp.firstName} ${foundEmp.lastName}`,
+      comments: statusEntry?.comments || null,
+      actionDate: statusEntry?.actionDate || null,
+    };
+
+    if (!pendingEncountered) {
+      if (statusEntry?.status === "Approved") {
+        result.push({ ...baseEntry, status: "Approved" });
+      } else if (statusEntry?.status === "Rejected") {
+        result.push({ ...baseEntry, status: "Rejected" });
+        break;
+      } else {
+        result.push({ ...baseEntry, status: "Pending" });
+        pendingEncountered = true;
+      }
+    } else {
+      result.push({ ...baseEntry, status: "Pending" });
+    }
+  }
+
+  return result;
+};
+
 export {
   getApprovalStepEmployees,
   extractEmpNo,
   generateEmpNo,
   getApprovalStepManagetToEmployees,
+  getApprovalTemLeaderToEmployees,
 };

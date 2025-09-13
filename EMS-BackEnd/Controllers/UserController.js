@@ -332,6 +332,18 @@ const UpdateEmployeeList = async (req, res) => {
     //   (existingType.pfNo = generatePFNo()),
     //   (existingType.uan = generateUAN()),
     //   (existingType.pan = generatePAN()),
+
+    // Update UserReporting if `reportedBy` changed
+    if (reportedBy !== existingType.reportedBy) {
+      const empNo = existingType.empNo;
+      const newReportedByEmpID = extractEmpNo(reportedBy);
+      await UserReporting.findOneAndUpdate(
+        { employee: empNo },
+        { reportedByEmployee: newReportedByEmpID },
+        { upsert: true }
+      );
+    }
+
     if (salary) {
       const breakup = calculateSalaryBreakup(salary);
 

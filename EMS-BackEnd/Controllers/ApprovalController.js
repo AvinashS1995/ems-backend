@@ -149,15 +149,23 @@ const getEmpApprovalList = async (req, res) => {
       try {
         const Model = mongoose.model(typeName);
 
-        count = await Model.countDocuments({
-          approvalFlowId: approval._id,
-          approvalStatus: {
-            $elemMatch: {
-              empNo: approverEmpNo,
-              status: "Pending",
+        if (displayName === "Task Assign Request") {
+          // approval inside Project.tasks array
+          count = await Model.countDocuments({
+            "tasks.approvalFlowId": approval._id,
+            "tasks.approvalStatus": {
+              $elemMatch: { empNo: approverEmpNo, status: "Pending" },
             },
-          },
-        });
+          });
+        } else {
+          // approval at root level
+          count = await Model.countDocuments({
+            approvalFlowId: approval._id,
+            approvalStatus: {
+              $elemMatch: { empNo: approverEmpNo, status: "Pending" },
+            },
+          });
+        }
       } catch (err) {
         console.warn(`Model not found for typeName: ${typeName}`);
         console.log(err);

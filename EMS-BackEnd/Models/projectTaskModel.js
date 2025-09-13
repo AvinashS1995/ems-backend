@@ -33,9 +33,18 @@ const TaskSchema = new mongoose.Schema({
   milestones: String,
   status: {
     type: String,
-    enum: ["Pending", "In Progress", "Completed"],
-    default: "Pending",
   },
+  approvalFlowId: { type: mongoose.Schema.Types.ObjectId, ref: "ApprovalFlow" },
+  approvalStatus: [
+    {
+      role: String,
+      empNo: String,
+      name: String,
+      status: String, // Pending, Approved, Submitted, Rejected
+      comments: String,
+      actionDate: String,
+    },
+  ],
   assignTo: {
     empNo: { type: String, required: true },
     name: String,
@@ -48,7 +57,7 @@ const TaskSchema = new mongoose.Schema({
     role: String,
   },
   updatedBy: {
-    empNo: { type: String, required: true },
+    empNo: { type: String },
     name: String,
     role: String,
   },

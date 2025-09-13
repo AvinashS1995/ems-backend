@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import dotenv from "dotenv";
+import { Projects } from "../Models/projectTaskModel.js";
 dotenv.config({ path: "./.env" });
 
 const ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_SECRET_KEY, "hex");
@@ -39,4 +40,24 @@ export async function generateId(model, prefix, idField) {
   const lastNumber = parseInt(lastDoc[idField].replace(prefix, ""), 10);
   const newNumber = lastNumber + 1;
   return `${prefix}${String(newNumber).padStart(3, "0")}`;
+}
+
+export async function generateTaskId() {
+  // Find the project containing the latest created task
+  const lastProject = await Projects.findOne(
+    { "tasks.0": { $exists: true } }, // ensure it has tasks
+    { tasks: { $slice: -1 } } // only get the last task
+  )
+    .sort({ "tasks.createAt": -1 }) // sort by last task creation
+    .lean();
+
+  if (!lastProject || !lastProject.tasks || lastProject.tasks.length === 0) {
+    return "TSK001";
+  }
+
+  const lastTaskId = lastProject.tasks[lastProject.tasks.length - 1].taskId;
+  const lastNumber = parseInt(lastTaskId.replace("TSK", ""), 10);
+  const newNumber = lastNumber + 1;
+
+  return `TSK${String(newNumber).padStart(3, "0")}`;
 }
