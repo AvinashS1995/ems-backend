@@ -201,7 +201,7 @@ router.post("/projects", getProjects);
  *   post:
  *     summary: Project Assign Approve Reject
  *     tags:
- *       - Project
+ *       - Projects
  *     requestBody:
  *       required: true
  *       content:
@@ -257,7 +257,7 @@ router.post("/tasks", getTasksByProject);
  *   post:
  *     summary: Project Assign Approve Reject
  *     tags:
- *       - Project
+ *       - Projects
  *     requestBody:
  *       required: true
  *       content:

@@ -12,6 +12,7 @@ import popupRoute from "./Routes/popupRoute.js";
 import meetingRoutes from "./Routes/meetingRoute.js";
 import payrollRoutes from "./Routes/payrollRoute.js";
 import projectRoutes from "./Routes/projectTaskRoute.js";
+import weatherRoutes from "./Routes/weatherRoute.js";
 import { ConnectToDatabase } from "./db/db.js";
 import setupSwagger from "./swagger/swagger.js";
 import startCron from "./crons/cronRun.js";
@@ -39,6 +40,7 @@ app.use("/api/popup", popupRoute);
 app.use("/api/meeting", meetingRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/project", projectRoutes);
+app.use("/api/weather", weatherRoutes);
 
 setupSwagger(app);
 
