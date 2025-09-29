@@ -1,5 +1,6 @@
 import axios from "axios";
 import { WeatherForcastLog, Cities } from "../Models/weatherModel.js";
+import { getAQILabel, getPollutantAQI } from "../common/weather.js";
 
 export const getWeather = async (req, res) => {
   try {
@@ -34,7 +35,7 @@ export const getWeather = async (req, res) => {
     }
 
     const forecastRes = await axios.get(
-      `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&daily=sunrise,sunset,uv_index_max,temperature_2m_min,temperature_2m_max,apparent_temperature_min,apparent_temperature_max,sunshine_duration,daylight_duration&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability,precipitation,apparent_temperature,visibility,weather_code&current=temperature_2m,relative_humidity_2m,wind_speed_10m,is_day,apparent_temperature,precipitation,weather_code,surface_pressure&minutely_15=visibility,temperature_2m,apparent_temperature`
+      `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&forecast_days=10&timezone=auto&daily=sunrise,sunset,uv_index_max,temperature_2m_min,temperature_2m_max,apparent_temperature_min,apparent_temperature_max,sunshine_duration,daylight_duration,weather_code,windspeed_10m_max,relative_humidity_2m_max&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability,precipitation,apparent_temperature,visibility,weather_code&current=temperature_2m,relative_humidity_2m,wind_speed_10m,is_day,apparent_temperature,precipitation,weather_code,surface_pressure&minutely_15=visibility,temperature_2m,apparent_temperature`
     );
 
     const airQualityRes = await axios.get(
@@ -46,6 +47,12 @@ export const getWeather = async (req, res) => {
       pm10: airQualityRes.data.hourly.pm10[0],
       ozone: airQualityRes.data.hourly.ozone[0],
       carbon_monoxide: airQualityRes.data.hourly.carbon_monoxide[0],
+      label: getAQILabel(
+        Math.max(
+          getPollutantAQI(airQualityRes.data.hourly.pm2_5[0], "pm2_5"),
+          getPollutantAQI(airQualityRes.data.hourly.pm10[0], "pm10")
+        )
+      ),
     };
 
     forecastRes.data.airQuality = airQualityData;
