@@ -23,7 +23,11 @@ ConnectToDatabase();
 const app = express();
 app.use(
   cors({
-    origin: ["http://localhost:4200", "https://ems-project-kappa.vercel.app"],
+    origin: [
+      "http://localhost:4200",
+      "https://ems-project-kappa.vercel.app",
+      "https://weather-forecast-dashboard-theta.vercel.app",
+    ],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
   })
