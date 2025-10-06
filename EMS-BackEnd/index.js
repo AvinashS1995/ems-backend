@@ -13,6 +13,7 @@ import meetingRoutes from "./Routes/meetingRoute.js";
 import payrollRoutes from "./Routes/payrollRoute.js";
 import projectRoutes from "./Routes/projectTaskRoute.js";
 import weatherRoutes from "./Routes/weatherRoute.js";
+import invoiceRoutes from "./Routes/invoiceRoute.js";
 import { ConnectToDatabase } from "./db/db.js";
 import setupSwagger from "./swagger/swagger.js";
 import startCron from "./crons/cronRun.js";
@@ -45,6 +46,7 @@ app.use("/api/meeting", meetingRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/project", projectRoutes);
 app.use("/api/weather", weatherRoutes);
+app.use("/api/invoice", invoiceRoutes);
 
 setupSwagger(app);
 
