@@ -11,3 +11,6 @@ export const ROLE_ID = {
   [ROLE.EMPLOYEE]: 3,
   [ROLE.HR]: 4,
 };
+
+export const PASSWORD_PATTERN_REGEX =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
