@@ -15,13 +15,18 @@ const REFRESH_TOKEN_EXPIRES_IN = "7d";
  * @returns {Object} - Contains both tokens
  */
 export const generateTokens = (admin) => {
-  const payload = { id: admin._id, role: admin.role };
+  const payload = {
+    id: admin._id,
+    role: admin.role,
+    fullName: admin.fullName,
+    email: admin.email,
+  };
 
   const accessToken = jwt.sign(payload, JWT_SECRET_KEY, {
     expiresIn: ACCESS_TOKEN_EXPIRES_IN,
   });
 
-  const refreshToken = jwt.sign({ id: admin._id }, JWT_SECRET_KEY, {
+  const refreshToken = jwt.sign({ payload }, JWT_SECRET_KEY, {
     expiresIn: REFRESH_TOKEN_EXPIRES_IN,
   });
 

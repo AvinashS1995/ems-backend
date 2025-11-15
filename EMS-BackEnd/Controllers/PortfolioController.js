@@ -1,14 +1,16 @@
-import { PASSWORD_PATTERN_REGEX } from "../common/constant.js";
-import { resetPassworlUrlMailSentMail } from "../mail/sentMailForResetPasswordUrl.js";
 import {
+  About,
   Admin,
   DashboardCards,
   DashboardStats,
+  Services,
 } from "../Models/portfolioModel.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { generateTokens } from "../common/generateTokens.js";
+import mongoose from "mongoose";
+import { ideahub_v1alpha } from "googleapis";
 
 dotenv.config({ path: "./.env" });
 
@@ -82,15 +84,43 @@ const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
 
 export const createAdmin = async (req, res) => {
   try {
-    const { fullName, email, password, role } = req.body;
-    const exists = await Admin.findOne({ email });
-    if (exists)
-      return res.status(400).json({ message: "Email already exists" });
+    const { fullName, email, role, password } = req.body;
 
-    const admin = await Admin.create({ fullName, email, password, role });
-    return res.status(201).json({ message: "Admin created", admin });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
+    // Validate Required Fields
+    if (!fullName || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "fields are required",
+      });
+    }
+
+    // Check if email already exists
+    const existingEmail = await Admin.findOne({ email });
+    if (existingEmail) {
+      return res.status(409).json({
+        success: false,
+        message: "Email already registered",
+      });
+    }
+
+    // Create Admin → username auto-generates from model hook
+    const admin = await Admin.create({
+      fullName,
+      email,
+      password,
+      role: role,
+    });
+
+    return res.status(201).json({
+      status: "success",
+      message: `${role} created successfully`,
+      data: { admin },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "fail",
+      error: error.message,
+    });
   }
 };
 
@@ -400,7 +430,7 @@ export const toggleLockAdmin = async (req, res) => {
 
 export const getAdminActivity = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.body;
     const admin = await Admin.findById(id);
     if (!admin) return res.status(404).json({ message: "Admin not found" });
 
@@ -412,32 +442,34 @@ export const getAdminActivity = async (req, res) => {
   }
 };
 
-export const saveDashboardCard = async (req, res) => {
+export const saveDashboardCards = async (req, res) => {
   try {
-    const { icon, title, desc, link } = req.body;
-    if (!title || !link)
-      return res.status(400).json({
-        success: "success",
-        message: "Title and link are required",
+    const { role, cards } = req.body;
+
+    if (!role || !cards) {
+      return res.status(400).json({ message: "Role and cards are required." });
+    }
+
+    const existing = await DashboardCards.findOne({ role });
+    if (existing) {
+      existing.cards = cards;
+      await existing.save();
+      return res.status(200).json({
+        status: "success",
+        message: "Cards updated successfully",
+        data: { existing },
       });
+    }
 
-    const newCard = new DashboardCards({
-      icon,
-      title,
-      desc,
-      link,
-      createdBy: req.user?.id || "system",
-    });
-
-    await newCard.save();
+    const newCards = await DashboardCards.create({ role, cards });
     res.status(201).json({
-      success: "success",
-      message: "Card saved successfully",
-      data: { newCard },
+      status: "success",
+      message: "Cards saved successfully",
+      data: { newCards },
     });
   } catch (error) {
     res.status(500).json({
-      success: "fail",
+      status: "fail",
       message: error.error.message,
     });
   }
@@ -445,64 +477,635 @@ export const saveDashboardCard = async (req, res) => {
 
 export const getDashboardCards = async (req, res) => {
   try {
-    const cards = await DashboardCards.find().sort({ createdAt: -1 });
+    const { role } = req.body; // coming from frontend
+    if (!role)
+      return res.status(400).json({
+        status: "fail",
+        message: "Role is required.",
+      });
+
+    const data = await DashboardCards.findOne({ role });
+    if (!data)
+      return res.status(404).json({
+        status: "fail",
+        message: "No cards found for this role.",
+      });
+
     res.status(200).json({
-      success: "success",
+      status: "success",
       message: "Record(s) Fetched Successfully!",
-      data: { cards },
+      data: { cards: data.cards },
     });
   } catch (error) {
     res.status(500).json({
-      success: "fail",
-      message: error.error.message,
+      status: "fail",
+      message: error.message,
     });
   }
 };
 
-export const saveDashboardStat = async (req, res) => {
+export const saveDashboardStats = async (req, res) => {
   try {
-    const { label, count, icon, link, color } = req.body;
-    if (!label || count == null)
+    const { role, stats } = req.body;
+
+    if (!role || !stats) {
       return res.status(400).json({
-        success: "success",
-        message: "Label and count are required",
+        status: "fail",
+        message: "Role and stats are required.",
       });
+    }
 
-    const newStat = new DashboardStats({
-      label,
-      count,
-      icon,
-      link,
-      color,
-      createdBy: req.user?.id || "system",
-    });
+    const existing = await DashboardStats.findOne({ role });
 
-    await newStat.save();
+    if (existing) {
+      existing.stats = stats;
+      await existing.save();
+      return res.status(200).json({
+        status: "success",
+        message: "Stats updated successfully",
+        data: { existing },
+      });
+    }
+
+    const newStats = await DashboardStats.create({ role, stats });
     res.status(201).json({
-      success: "success",
-      message: "Stat saved successfully",
-      data: { newStat },
+      status: "success",
+      message: "Stats saved successfully",
+      data: { newStats },
     });
   } catch (error) {
     res.status(500).json({
-      success: "fail",
-      message: error.error.message,
+      status: "fail",
+      message: error.message,
     });
   }
 };
 
 export const getDashboardStats = async (req, res) => {
   try {
-    const stats = await DashboardStats.find().sort({ createdAt: -1 });
+    const { role } = req.body;
+    if (!role)
+      return res.status(400).json({
+        status: "fail",
+        message: "Role is required.",
+      });
+
+    const data = await DashboardStats.findOne({ role });
+    if (!data)
+      return res.status(404).json({
+        status: "fail",
+        message: "No stats found for this role.",
+      });
+
     res.status(200).json({
-      success: "success",
-      message: "Record(s) Fetchded Successfully!",
-      data: { stats },
+      status: "success",
+      message: "Record(s) Fetched Successfully!",
+      data: { stats: data.stats },
     });
   } catch (error) {
     res.status(500).json({
-      success: "fail",
-      message: error.error.message,
+      status: "fail",
+      message: error.message,
     });
+  }
+};
+
+// Portfolio About API
+export const SavePortfolioAbout = async (req, res) => {
+  try {
+    const adminId = req.body.id;
+
+    const { name, title, bio, bio2, profileImage, resumeUrl, stats } = req.body;
+
+    // Required fields
+    if (!name || !title || !bio) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Name, Title and Bio are required",
+      });
+    }
+
+    // Find admin
+    const admin = await Admin.findById(adminId);
+    // if (!admin) {
+    //   return res.status(404).json({
+    //     status: "fail",
+    //     message: "Admin not found",
+    //   });
+    // }
+
+    // Detect create vs update
+    const isNew = !admin.about || !admin.about.name;
+
+    // Initialize about field if empty
+    if (!admin.about) admin.about = {};
+
+    // Assign values
+    admin.about.name = name;
+    admin.about.title = title;
+    admin.about.bio = bio;
+    admin.about.bio2 = bio2 || "";
+    admin.about.profileImage = profileImage || "";
+    admin.about.resumeUrl = resumeUrl || "";
+
+    // Stats
+    admin.about.stats = {
+      experience: stats?.experience || 0,
+      clients: stats?.clients || 0,
+      recruiters: stats?.recruiters || 0,
+    };
+
+    admin.about.updatedAt = new Date();
+
+    await admin.save();
+
+    return res.status(isNew ? 201 : 200).json({
+      status: "success",
+      action: isNew ? "Created" : "Updated",
+      message: isNew
+        ? "About section created successfully"
+        : "About section updated successfully",
+      data: admin.about,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      status: "fail",
+      message: err.message,
+    });
+  }
+};
+
+export const GetPortfolioAbout = async (req, res) => {
+  try {
+    const adminId = req.body.id;
+
+    const admin = await Admin.findById(adminId);
+
+    res.status(200).json({
+      status: "success",
+      message: "About data fetched successfully",
+      data: { about: admin.about },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+// Portfolio Educations API
+export const AddEducation = async (req, res) => {
+  try {
+    const { adminId, degree, university, period } = req.body;
+
+    if (!adminId || !degree || !university || !period) {
+      return res
+        .status(400)
+        .json({ status: "fail", message: "All fields are required" });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const newEducation = {
+      id: new mongoose.Types.ObjectId(),
+      degree,
+      university,
+      period,
+    };
+
+    admin.education.push(newEducation);
+    await admin.save();
+
+    res.status(201).json({
+      status: "success",
+      message: "Education added successfully",
+      data: { newEducation: admin.education },
+    });
+  } catch (err) {
+    console.error("Add Education Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const GetPortfolioEducations = async (req, res) => {
+  try {
+    const { id } = req.body;
+
+    const admin = await Admin.findById(id);
+
+    const sortedEducations = (admin.education || []).sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    res.status(200).json({
+      status: "success",
+      message: "Educations data fetched successfully",
+      data: { educations: sortedEducations || [] },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const UpdateEducation = async (req, res) => {
+  try {
+    const { adminId, eduId, degree, university, period } = req.body;
+
+    if (!adminId || !eduId || !degree || !university || !period) {
+      return res
+        .status(400)
+        .json({ status: "fail", message: "All fields are required" });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const eduIndex = admin.education.findIndex(
+      (e) => e._id.toString() === eduId
+    );
+    if (eduIndex === -1) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Education not found" });
+    }
+
+    // Update fields
+    admin.education[eduIndex] = {
+      ...admin.education[eduIndex],
+      degree,
+      university,
+      period,
+      updatedAt: new Date(),
+    };
+
+    await admin.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Education updated successfully",
+      data: admin.education[eduIndex],
+    });
+  } catch (err) {
+    console.error("Update Education Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const DeleteEducation = async (req, res) => {
+  try {
+    const { adminId, eduId } = req.body;
+
+    if (!adminId || !eduId) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Admin ID and Education ID are required",
+      });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const eduIndex = admin.education.findIndex(
+      (e) => e._id.toString() === eduId
+    );
+    if (eduIndex === -1) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Education not found" });
+    }
+
+    const removedEdu = admin.education.splice(eduIndex, 1); // remove from array
+    await admin.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Education deleted successfully",
+      data: removedEdu[0],
+    });
+  } catch (err) {
+    console.error("Delete Education Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+// Portfolio Experiences API
+export const AddPortfolioExperiences = async (req, res) => {
+  try {
+    const { adminId, company, role, period, project, description } = req.body;
+
+    if (!adminId || !company || !role || !period || !project || !description) {
+      return res
+        .status(400)
+        .json({ status: "fail", message: "All fields are required" });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const newExperience = {
+      id: new mongoose.Types.ObjectId(),
+      company,
+      role,
+      period,
+      project,
+      description,
+      createdAt: new Date(),
+    };
+
+    admin.experience.push(newExperience);
+    await admin.save();
+
+    res.status(201).json({
+      status: "success",
+      message: "Experience added successfully",
+      data: { newExperience: admin.experience },
+    });
+  } catch (err) {
+    console.error("Add Experience Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const GetPortfolioExperiences = async (req, res) => {
+  try {
+    const { id } = req.body;
+
+    const admin = await Admin.findById(id);
+
+    const sortedExperiences = (admin.experience || []).sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    res.status(200).json({
+      status: "success",
+      message: "Experiences data fetched successfully",
+      data: { experience: sortedExperiences || [] },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const UpdatePortfolioExperiences = async (req, res) => {
+  try {
+    const { adminId, expId, company, role, period, project, description } =
+      req.body;
+
+    if (
+      !adminId ||
+      !expId ||
+      !company ||
+      !role ||
+      !period ||
+      !project ||
+      !description
+    ) {
+      return res
+        .status(400)
+        .json({ status: "fail", message: "All fields are required" });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const expIndex = admin.experience.findIndex(
+      (e) => e._id.toString() === expId
+    );
+    if (expIndex === -1) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Experience not found" });
+    }
+
+    // Update fields
+    admin.experience[expIndex] = {
+      ...admin.experience[expIndex],
+      company,
+      role,
+      period,
+      project,
+      description,
+      updatedAt: new Date(),
+    };
+
+    await admin.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Experience updated successfully",
+      data: admin.experience[expIndex],
+    });
+  } catch (err) {
+    console.error("Update Experience Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const DeletePortfolioExperiences = async (req, res) => {
+  try {
+    const { adminId, expId } = req.body;
+
+    if (!adminId || !expId) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Admin ID and Experience ID are required",
+      });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const expIndex = admin.experience.findIndex(
+      (e) => e._id.toString() === expId
+    );
+    if (expIndex === -1) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Experience not found" });
+    }
+
+    const removedExp = admin.experience.splice(expIndex, 1); // remove from array
+    await admin.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Experience deleted successfully",
+      data: removedExp[0],
+    });
+  } catch (err) {
+    console.error("Delete Experience Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+// Portfolio Services API
+export const AddPortfolioServices = async (req, res) => {
+  try {
+    const { adminId, title, icon, color, description } = req.body;
+
+    if (!adminId || !title || !icon || !color || !description) {
+      return res
+        .status(400)
+        .json({ status: "fail", message: "All fields are required" });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const newServices = {
+      id: new mongoose.Types.ObjectId(),
+      title,
+      icon,
+      color,
+      description,
+      createdAt: new Date(),
+    };
+
+    admin.services.push(newServices);
+    await admin.save();
+
+    res.status(201).json({
+      status: "success",
+      message: "Services added successfully",
+      data: { newServices: admin.services },
+    });
+  } catch (err) {
+    console.error("Add Services Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const GetPortfolioServices = async (req, res) => {
+  try {
+    const { id } = req.body;
+
+    const admin = await Admin.findById(id);
+
+    const sortedServices = admin.services || [];
+
+    res.status(200).json({
+      status: "success",
+      message: "Services data fetched successfully",
+      data: { services: sortedServices || [] },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const UpdatePortfolioServices = async (req, res) => {
+  try {
+    const { adminId, serviceId, title, icon, color, description } = req.body;
+
+    if (!adminId || !serviceId || !title || !icon || !color || !description) {
+      return res
+        .status(400)
+        .json({ status: "fail", message: "All fields are required" });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const servicesIndex = admin.services.findIndex(
+      (e) => e._id.toString() === serviceId
+    );
+    if (servicesIndex === -1) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Services not found" });
+    }
+
+    // Update fields
+    admin.services[servicesIndex] = {
+      ...admin.services[servicesIndex],
+      title,
+      icon,
+      color,
+      description,
+      updatedAt: new Date(),
+    };
+
+    await admin.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Services updated successfully",
+      data: admin.services[servicesIndex],
+    });
+  } catch (err) {
+    console.error("Update Services Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const DeletePortfolioServices = async (req, res) => {
+  try {
+    const { adminId, serviceId } = req.body;
+
+    if (!adminId || !serviceId) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Admin ID and Services ID are required",
+      });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const servicesIndex = admin.services.findIndex(
+      (e) => e._id.toString() === serviceId
+    );
+    if (servicesIndex === -1) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Services not found" });
+    }
+
+    const removedServices = admin.services.splice(servicesIndex, 1); // remove from array
+    await admin.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Services deleted successfully",
+      data: removedServices[0],
+    });
+  } catch (err) {
+    console.error("Delete Services Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
   }
 };
