@@ -1,20 +1,26 @@
 import express from "express";
 import {
   AddEducation,
+  AddPortfolioContactInfo,
   AddPortfolioExperiences,
+  AddPortfolioProjects,
   AddPortfolioServices,
   createAdmin,
   deleteAdmin,
   DeleteEducation,
+  DeletePortfolioContactInfo,
   DeletePortfolioExperiences,
+  DeletePortfolioProjects,
   DeletePortfolioServices,
   getAdminActivity,
   GetAdminUserList,
   getDashboardCards,
   getDashboardStats,
   GetPortfolioAbout,
+  GetPortfolioContactInfo,
   GetPortfolioEducations,
   GetPortfolioExperiences,
+  GetPortfolioProjects,
   GetPortfolioServices,
   Login,
   LogOut,
@@ -26,7 +32,9 @@ import {
   toggleLockAdmin,
   updateAdmin,
   UpdateEducation,
+  UpdatePortfolioContactInfo,
   UpdatePortfolioExperiences,
+  UpdatePortfolioProjects,
   UpdatePortfolioServices,
 } from "../Controllers/PortfolioController.js";
 
@@ -899,5 +907,295 @@ router.post("/update-portfolio-service", UpdatePortfolioServices);
  *         description: Server error
  */
 router.post("/delete-portfolio-service", DeletePortfolioServices);
+/**
+ * @swagger
+ * /api/portfolio/save-portfolio-project:
+ *   post:
+ *     summary: Add a new project entry
+ *     tags:
+ *       - Portfolio (Project)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adminId:
+ *                 type: string
+ *               title:
+ *                 type: string
+ *               category:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *               image:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               codeLink:
+ *                 type: string
+ *               previewLink:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Project added successfully
+ *       400:
+ *         description: All fields are required
+ *       404:
+ *         description: Admin not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/save-portfolio-project", AddPortfolioProjects);
+
+/**
+ * @swagger
+ * /api/portfolio/get-portfolio-projects:
+ *   post:
+ *     summary: Get all project entries for an admin
+ *     tags:
+ *       - Portfolio (Project)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Projects fetched successfully
+ *       404:
+ *         description: Admin not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/get-portfolio-projects", GetPortfolioProjects);
+
+/**
+ * @swagger
+ * /api/portfolio/update-portfolio-project:
+ *   post:
+ *     summary: Update an existing project entry
+ *     tags:
+ *       - Portfolio (Project)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adminId:
+ *                 type: string
+ *               projectId:
+ *                 type: string
+ *               title:
+ *                 type: string
+ *               category:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *               image:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               codeLink:
+ *                 type: string
+ *               previewLink:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Project updated successfully
+ *       400:
+ *         description: All fields are required
+ *       404:
+ *         description: Admin or project not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/update-portfolio-project", UpdatePortfolioProjects);
+
+/**
+ * @swagger
+ * /api/portfolio/delete-portfolio-project:
+ *   post:
+ *     summary: Delete a project entry
+ *     tags:
+ *       - Portfolio (Project)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adminId:
+ *                 type: string
+ *               projectId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Project deleted successfully
+ *       400:
+ *         description: Admin ID and Project ID required
+ *       404:
+ *         description: Admin or project not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/delete-portfolio-project", DeletePortfolioProjects);
+/**
+ * @swagger
+ * /api/portfolio/save-portfolio-contact:
+ *   post:
+ *     summary: Add a new contact info entry
+ *     tags:
+ *       - Portfolio (Contact Info)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adminId:
+ *                 type: string
+ *               company:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *               city:
+ *                 type: string
+ *               country:
+ *                 type: string
+ *               postalCode:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               mapEmbedUrl:
+ *                 type: string
+ *               socialMedia:
+ *                 type: object
+ *     responses:
+ *       201:
+ *         description: Contact info added successfully
+ *       400:
+ *         description: Required fields missing
+ *       404:
+ *         description: Admin not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/save-portfolio-contact-info", AddPortfolioContactInfo);
+
+/**
+ * @swagger
+ * /api/portfolio/get-portfolio-contact:
+ *   post:
+ *     summary: Get all contact info entries for an admin
+ *     tags:
+ *       - Portfolio (Contact Info)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Contact info fetched successfully
+ *       404:
+ *         description: Admin not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/get-portfolio-contact-info", GetPortfolioContactInfo);
+
+/**
+ * @swagger
+ * /api/portfolio/update-portfolio-contact:
+ *   post:
+ *     summary: Update an existing contact info entry
+ *     tags:
+ *       - Portfolio (Contact Info)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adminId:
+ *                 type: string
+ *               contactInfoId:
+ *                 type: string
+ *               company:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *               city:
+ *                 type: string
+ *               country:
+ *                 type: string
+ *               postalCode:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               mapEmbedUrl:
+ *                 type: string
+ *               socialMedia:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Contact info updated successfully
+ *       400:
+ *         description: Required fields missing
+ *       404:
+ *         description: Admin or Contact Info not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/update-portfolio-contact-info", UpdatePortfolioContactInfo);
+
+/**
+ * @swagger
+ * /api/portfolio/delete-portfolio-contact:
+ *   post:
+ *     summary: Delete a contact info entry
+ *     tags:
+ *       - Portfolio (Contact Info)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adminId:
+ *                 type: string
+ *               contactInfoId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Contact info deleted successfully
+ *       400:
+ *         description: Admin ID and Contact Info ID required
+ *       404:
+ *         description: Admin or contact info not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/delete-portfolio-contact-info", DeletePortfolioContactInfo);
 
 export default router;

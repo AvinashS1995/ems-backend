@@ -1109,3 +1109,351 @@ export const DeletePortfolioServices = async (req, res) => {
     res.status(500).json({ status: "fail", message: err.message });
   }
 };
+
+// Portfolio Projects API
+export const AddPortfolioProjects = async (req, res) => {
+  try {
+    const {
+      adminId,
+      title,
+      category,
+      role,
+      image,
+      description,
+      codeLink,
+      previewLink,
+    } = req.body;
+
+    if (
+      !adminId ||
+      !title ||
+      !category ||
+      !role ||
+      !image ||
+      !codeLink ||
+      !previewLink
+    ) {
+      return res
+        .status(400)
+        .json({ status: "fail", message: "All fields are required" });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const newProjects = {
+      id: new mongoose.Types.ObjectId(),
+      title,
+      category,
+      role,
+      image,
+      description,
+      codeLink,
+      previewLink,
+      createdAt: new Date(),
+    };
+
+    admin.projects.push(newProjects);
+    await admin.save();
+
+    res.status(201).json({
+      status: "success",
+      message: "Projects added successfully",
+      data: { newProjects: admin.projects },
+    });
+  } catch (err) {
+    console.error("Add Projects Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const GetPortfolioProjects = async (req, res) => {
+  try {
+    const { id } = req.body;
+
+    const admin = await Admin.findById(id);
+
+    const sortedProjects = admin.projects || [];
+
+    res.status(200).json({
+      status: "success",
+      message: "Projects data fetched successfully",
+      data: { projects: sortedProjects || [] },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const UpdatePortfolioProjects = async (req, res) => {
+  try {
+    const {
+      adminId,
+      projectId,
+      title,
+      category,
+      role,
+      image,
+      description,
+      codeLink,
+      previewLink,
+    } = req.body;
+
+    if (
+      !adminId ||
+      !projectId ||
+      !title ||
+      !category ||
+      !role ||
+      !image ||
+      !codeLink ||
+      !previewLink
+    ) {
+      return res
+        .status(400)
+        .json({ status: "fail", message: "All fields are required" });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const projectsIndex = admin.projects.findIndex(
+      (e) => e._id.toString() === projectId
+    );
+    if (projectsIndex === -1) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Projects not found" });
+    }
+
+    // Update fields
+    admin.projects[projectsIndex] = {
+      ...admin.projects[projectsIndex],
+      title,
+      icon,
+      color,
+      description,
+      updatedAt: new Date(),
+    };
+
+    await admin.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Projects updated successfully",
+      data: admin.projects[projectsIndex],
+    });
+  } catch (err) {
+    console.error("Update Projects Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const DeletePortfolioProjects = async (req, res) => {
+  try {
+    const { adminId, projectId } = req.body;
+
+    if (!adminId || !projectId) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Admin ID and Projects ID are required",
+      });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const projectsIndex = admin.services.findIndex(
+      (e) => e._id.toString() === projectId
+    );
+    if (projectsIndex === -1) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Projects not found" });
+    }
+
+    const removedProjects = admin.projects.splice(projectsIndex, 1); // remove from array
+    await admin.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Projects deleted successfully",
+      data: removedProjects[0],
+    });
+  } catch (err) {
+    console.error("Delete Projects Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+// Portfolio Contact Info API
+export const AddPortfolioContactInfo = async (req, res) => {
+  try {
+    const {
+      adminId,
+      company,
+      address,
+      city,
+      country,
+      postalCode,
+      email,
+      phone,
+      mapEmbedUrl,
+      socialMedia,
+    } = req.body;
+
+    if (!adminId || !company || !email || !phone) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Required fields missing",
+      });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found",
+      });
+    }
+
+    // Save single contact object
+    admin.contactInfo = {
+      location: {
+        company,
+        address,
+        city,
+        country,
+        postalCode,
+        mapEmbedUrl,
+      },
+      email,
+      phone,
+      socialMedia,
+      createdBy: adminId,
+      createdAt: new Date(),
+    };
+
+    await admin.save();
+
+    res.status(201).json({
+      status: "success",
+      message: "Contact added successfully",
+      data: { contactInfo: admin.contactInfo },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const GetPortfolioContactInfo = async (req, res) => {
+  try {
+    const { id } = req.body;
+
+    const admin = await Admin.findById(id);
+
+    res.status(200).json({
+      status: "success",
+      message: "Data fetched",
+      data: { contactInfo: admin.contactInfo || {} },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const UpdatePortfolioContactInfo = async (req, res) => {
+  try {
+    const {
+      adminId,
+      company,
+      address,
+      city,
+      country,
+      postalCode,
+      email,
+      phone,
+      mapEmbedUrl,
+      socialMedia,
+    } = req.body;
+
+    if (!adminId || !company || !email || !phone) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Required fields missing",
+      });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found",
+      });
+    }
+
+    // Replace whole object
+    admin.contactInfo = {
+      location: {
+        company,
+        address,
+        city,
+        country,
+        postalCode,
+        mapEmbedUrl,
+      },
+      email,
+      phone,
+      socialMedia,
+      createdBy: adminId,
+      updatedAt: new Date(),
+    };
+
+    await admin.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Contact updated",
+      data: { contactInfo: admin.contactInfo },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const DeletePortfolioContactInfo = async (req, res) => {
+  try {
+    const { adminId } = req.body;
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found",
+      });
+    }
+
+    admin.contactInfo = null; // ❗ Clear object
+
+    await admin.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Contact info Deleted",
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
