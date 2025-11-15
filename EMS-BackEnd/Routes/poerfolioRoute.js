@@ -7,6 +7,7 @@ import {
   AddPortfolioServices,
   createAdmin,
   deleteAdmin,
+  deleteContactMessage,
   DeleteEducation,
   DeletePortfolioContactInfo,
   DeletePortfolioExperiences,
@@ -14,6 +15,7 @@ import {
   DeletePortfolioServices,
   getAdminActivity,
   GetAdminUserList,
+  GetAllContactMessages,
   getDashboardCards,
   getDashboardStats,
   GetPortfolioAbout,
@@ -26,6 +28,7 @@ import {
   LogOut,
   refreshToken,
   resetPassword,
+  SaveContactMessage,
   saveDashboardCards,
   saveDashboardStats,
   SavePortfolioAbout,
@@ -1197,5 +1200,94 @@ router.post("/update-portfolio-contact-info", UpdatePortfolioContactInfo);
  *         description: Server error
  */
 router.post("/delete-portfolio-contact-info", DeletePortfolioContactInfo);
+/**
+ * @swagger
+ * /api/portfolio/save-portfolio-message/{slug}:
+ *   post:
+ *     summary: Save a new contact message for portfolio (slug-based)
+ *     tags:
+ *       - Portfolio (Messages)
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               subject:
+ *                 type: string
+ *               message:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Message saved successfully
+ *       404:
+ *         description: Admin not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/save-portfolio-message/:slug", SaveContactMessage);
+/**
+ * @swagger
+ * /api/portfolio/get-portfolio-messages:
+ *   post:
+ *     summary: Get all portfolio messages for an admin
+ *     tags:
+ *       - Portfolio (Messages)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Messages fetched successfully
+ *       404:
+ *         description: Admin not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/get-portfolio-messages", GetAllContactMessages);
+/**
+ * @swagger
+ * /api/portfolio/delete-portfolio-message:
+ *   post:
+ *     summary: Delete a portfolio message
+ *     tags:
+ *       - Portfolio (Messages)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adminId:
+ *                 type: string
+ *               messageId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Message deleted successfully
+ *       404:
+ *         description: Admin or message not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/delete-portfolio-message", deleteContactMessage);
 
 export default router;

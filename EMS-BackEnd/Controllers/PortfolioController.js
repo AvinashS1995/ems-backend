@@ -1,86 +1,19 @@
 import {
-  About,
   Admin,
   DashboardCards,
   DashboardStats,
-  Services,
 } from "../Models/portfolioModel.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { generateTokens } from "../common/generateTokens.js";
 import mongoose from "mongoose";
-import { ideahub_v1alpha } from "googleapis";
 
 dotenv.config({ path: "./.env" });
 
-const ACCESS_TOKEN_EXPIRES_IN = "15m"; // 15 minutes access token
-const blacklistedTokens = new Set(); // can be replaced by Redis in production
-const MAX_ATTEMPTS = 3;
-const LOCK_TIME = 15 * 60 * 1000; // 15 minutes
+const ACCESS_TOKEN_EXPIRES_IN = "15m";
+const blacklistedTokens = new Set();
 const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
-// export const createAdmin = async (req, res) => {
-//   try {
-//     const { fullName, email, password, confirmPassword, role } = req.body;
-//     console.log(req.body);
-//     // Validate fields
-//     if (!fullName || !email || !password || !confirmPassword)
-//       return res.status(400).json({
-//         status: "fail",
-//         message: "All fields are required",
-//       });
-
-//     if (password !== confirmPassword)
-//       return res.status(400).json({
-//         status: "fail",
-//         message: "Passwords do not match",
-//       });
-
-//     if (!PASSWORD_PATTERN_REGEX.test(password))
-//       return res.status(400).json({
-//         status: "fail",
-//         message:
-//           "Password must include uppercase, lowercase, number, and special character",
-//       });
-
-//     // Check if admin already exists
-//     const existingAdmin = await Admin.findOne({ email });
-//     if (existingAdmin)
-//       return res.status(400).json({
-//         status: "fail",
-//         message: "Admin already exists",
-//       });
-
-//     // Hash password
-//     const hashedPassword = await bcrypt.hash(password, 10);
-
-//     // Create admin with optional role
-//     const newAdmin = new Admin({
-//       fullName,
-//       email,
-//       password: hashedPassword,
-//       role: role || "admin",
-//     });
-
-//     await newAdmin.save();
-
-//     res.status(201).json({
-//       status: "success",
-//       message: "Admin account created successfully!",
-//       data: {
-//         fullName: newAdmin.fullName,
-//         email: newAdmin.email,
-//         role: newAdmin.role,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("❌ Error creating admin:", error);
-//     res.status(500).json({
-//       status: "fail",
-//       message: error.message,
-//     });
-//   }
-// };
 
 export const createAdmin = async (req, res) => {
   try {
@@ -543,12 +476,23 @@ export const saveDashboardStats = async (req, res) => {
 
 export const getDashboardStats = async (req, res) => {
   try {
-    const { role } = req.body;
-    if (!role)
+    const { role, adminId } = req.body;
+    if (!role || !adminId) {
       return res.status(400).json({
         status: "fail",
-        message: "Role is required.",
+        message: "Role and adminId are required.",
       });
+    }
+
+    // Get admin document
+    const admin = await Admin.findById(adminId);
+
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found",
+      });
+    }
 
     const data = await DashboardStats.findOne({ role });
     if (!data)
@@ -557,10 +501,35 @@ export const getDashboardStats = async (req, res) => {
         message: "No stats found for this role.",
       });
 
+    // AUTO COUNTS using embedded arrays
+    const servicesCount = admin.services?.length || 0;
+    const educationsCount = admin.education?.length || 0;
+    const experiencesCount = admin.experience?.length || 0;
+    const projectsCount = admin.projects?.length || 0;
+    const messagesCount = admin.messages?.length || 0;
+
+    // MAP COUNTS TO UI LABELS
+    const updatedStats = data.stats.map((item) => {
+      switch (item.label) {
+        case "Services":
+          return { ...item.toObject(), count: servicesCount };
+        case "Education":
+          return { ...item.toObject(), count: educationsCount };
+        case "Experiences":
+          return { ...item.toObject(), count: experiencesCount };
+        case "Projects":
+          return { ...item.toObject(), count: projectsCount };
+        case "Messages":
+          return { ...item.toObject(), count: messagesCount };
+        default:
+          return item;
+      }
+    });
+
     res.status(200).json({
       status: "success",
       message: "Record(s) Fetched Successfully!",
-      data: { stats: data.stats },
+      data: { stats: updatedStats },
     });
   } catch (error) {
     res.status(500).json({
@@ -1455,5 +1424,101 @@ export const DeletePortfolioContactInfo = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+// Portfolio Messages API
+export const SaveContactMessage = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { name, email, subject, message } = req.body;
+
+    // 1️⃣ Find admin using slug
+    const admin = await Admin.findOne({ slug });
+
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found for this slug",
+      });
+    }
+
+    // 2️⃣ Push message into admin.messages array
+    admin.messages.push({
+      name,
+      email,
+      subject,
+      message,
+      createdAt: new Date(),
+    });
+
+    // Save
+    await admin.save();
+
+    res.status(201).json({
+      status: "success",
+      message: "Message saved successfully",
+      data: admin.messages[admin.messages.length - 1], // return last added message
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "fail",
+      message: error.message,
+    });
+  }
+};
+
+export const GetAllContactMessages = async (req, res) => {
+  try {
+    const { id } = req.body;
+
+    const admin = await Admin.findById(id);
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin not found",
+      });
+    }
+
+    const sortedMessages = admin.messages.sort(
+      (a, b) => b.createdAt - a.createdAt
+    );
+
+    res.status(200).json({
+      status: "success",
+      message: "Received Messages Fetched!",
+      data: { messages: sortedMessages },
+    });
+  } catch (error) {
+    res.status(500).json({ status: "fail", message: error.message });
+  }
+};
+
+export const deleteContactMessage = async (req, res) => {
+  try {
+    const { adminId, messageId } = req.body;
+
+    const admin = await Admin.findById(adminId);
+
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found",
+      });
+    }
+
+    admin.messages = admin.messages.filter(
+      (msg) => msg._id.toString() !== messageId
+    );
+
+    await admin.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Message deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({ status: "fail", message: error.message });
   }
 };
