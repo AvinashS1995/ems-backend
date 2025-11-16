@@ -16,7 +16,7 @@ const AboutSchema = new mongoose.Schema({
   resumeUrl: String,
   stats: StatsSchema,
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
-  createdAt: { type: Date, default: Date.now },
+  createdAt: { type: Date },
   updatedAt: { type: Date },
 });
 
@@ -28,7 +28,7 @@ const ServiceSchema = new mongoose.Schema({
   color: String,
   description: String,
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
-  createdAt: { type: Date, default: Date.now },
+  createdAt: { type: Date },
   updatedAt: { type: Date },
 });
 
@@ -37,9 +37,12 @@ const Services = mongoose.model("Portfolio-Services", ServiceSchema);
 const EducationSchema = new mongoose.Schema({
   degree: String,
   university: String,
-  period: String,
+  fromYear: String,
+  toYear: String,
+  currentlyStudying: { type: Boolean, default: false },
+  // period: String,
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
-  createdAt: { type: Date, default: Date.now },
+  createdAt: { type: Date },
   updatedAt: { type: Date },
 });
 
@@ -48,15 +51,33 @@ const Educations = mongoose.model("Portfolio-Education", EducationSchema);
 const ExperienceSchema = new mongoose.Schema({
   company: String,
   role: String,
-  period: String,
+  fromYear: String,
+  toYear: String,
+  currentlyWorking: { type: Boolean, default: false },
   project: String,
   description: String,
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
-  createdAt: { type: Date, default: Date.now },
+  createdAt: { type: Date },
   updatedAt: { type: Date },
 });
 
 const Experiences = mongoose.model("Portfolio-Experience", ExperienceSchema);
+
+const SkillSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  icon: { type: String },
+});
+
+const SkillCategorySchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  color: { type: String, default: "#f58b49" },
+  icon: { type: String },
+  skills: [SkillSchema],
+  createdAt: { type: Date },
+  updatedAt: { type: Date },
+});
+
+const Skill = mongoose.model("Portfolio-Skill", SkillCategorySchema);
 
 const ProjectSchema = new mongoose.Schema({
   title: {
@@ -76,7 +97,6 @@ const ProjectSchema = new mongoose.Schema({
   },
   image: {
     type: String,
-    required: [true, "Image URL is required"],
     trim: true,
   },
   description: {
@@ -92,7 +112,7 @@ const ProjectSchema = new mongoose.Schema({
     default: "",
   },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
-  createdAt: { type: Date, default: Date.now },
+  createdAt: { type: Date },
   updatedAt: { type: Date },
 });
 
@@ -117,7 +137,7 @@ const ContactInfoSchema = new mongoose.Schema({
     facebook: String,
   },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
-  createdAt: { type: Date, default: Date.now },
+  createdAt: { type: Date },
   updatedAt: Date,
 });
 
@@ -128,7 +148,7 @@ const MessageSchema = new mongoose.Schema({
   email: String,
   subject: String,
   message: String,
-  createdAt: { type: Date, default: Date.now },
+  createdAt: { type: Date },
   assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
 });
 
@@ -163,13 +183,13 @@ const adminSchema = new mongoose.Schema({
   services: [ServiceSchema],
   education: [EducationSchema],
   experience: [ExperienceSchema],
+  skills: [SkillCategorySchema],
   projects: [ProjectSchema],
   messages: [MessageSchema],
-  createAt: {
+  createdAt: {
     type: Date,
-    default: Date.now,
   },
-  updateAt: {
+  updatedAt: {
     type: Date,
   },
 });

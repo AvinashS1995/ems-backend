@@ -5,6 +5,7 @@ import {
   AddPortfolioExperiences,
   AddPortfolioProjects,
   AddPortfolioServices,
+  AddPortfolioSkills,
   createAdmin,
   deleteAdmin,
   deleteContactMessage,
@@ -13,6 +14,7 @@ import {
   DeletePortfolioExperiences,
   DeletePortfolioProjects,
   DeletePortfolioServices,
+  DeletePortfolioSkills,
   getAdminActivity,
   GetAdminUserList,
   GetAllContactMessages,
@@ -24,6 +26,14 @@ import {
   GetPortfolioExperiences,
   GetPortfolioProjects,
   GetPortfolioServices,
+  GetPortfolioSkills,
+  GetPublicPortfolioAboutBySlug,
+  GetPublicPortfolioContactInfoBySlug,
+  GetPublicPortfolioEducationsBySlug,
+  GetPublicPortfolioExperiencesBySlug,
+  GetPublicPortfolioProjectsBySlug,
+  GetPublicPortfolioServicesBySlug,
+  GetPublicPortfolioSkillsBySlug,
   Login,
   LogOut,
   refreshToken,
@@ -39,6 +49,7 @@ import {
   UpdatePortfolioExperiences,
   UpdatePortfolioProjects,
   UpdatePortfolioServices,
+  UpdatePortfolioSkills,
 } from "../Controllers/PortfolioController.js";
 
 const router = express.Router();
@@ -606,8 +617,12 @@ router.post("/get-portfolio-educations", GetPortfolioEducations);
  *                 type: string
  *               university:
  *                 type: string
- *               period:
+ *               fromYear:
  *                 type: string
+ *               toYear:
+ *                 type: string
+ *               currentlyStudying:
+ *                 type: Boolean
  *     responses:
  *       200:
  *         description: Education updated successfully
@@ -781,6 +796,146 @@ router.post("/update-portfolio-experience", UpdatePortfolioExperiences);
  *         description: Server error
  */
 router.post("/delete-portfolio-experience", DeletePortfolioExperiences);
+/**
+ * @swagger
+ * /api/portfolio/save-portfolio-skill:
+ *   post:
+ *     summary: Add a new skill category
+ *     tags:
+ *       - Portfolio (Skills)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adminId:
+ *                 type: string
+ *               title:
+ *                 type: string
+ *               color:
+ *                 type: string
+ *               icon:
+ *                 type: string
+ *               skills:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                     icon:
+ *                       type: string
+ *     responses:
+ *       201:
+ *         description: Skill category added successfully
+ *       400:
+ *         description: All fields are required
+ *       404:
+ *         description: Admin not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/save-portfolio-skill", AddPortfolioSkills);
+/**
+ * @swagger
+ * /api/portfolio/get-portfolio-skills:
+ *   post:
+ *     summary: Get all skill categories for an admin
+ *     tags:
+ *       - Portfolio (Skills)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adminId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Skills fetched successfully
+ *       404:
+ *         description: Admin not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/get-portfolio-skills", GetPortfolioSkills);
+/**
+ * @swagger
+ * /api/portfolio/update-portfolio-skill:
+ *   post:
+ *     summary: Update an existing skill category
+ *     tags:
+ *       - Portfolio (Skills)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adminId:
+ *                 type: string
+ *               skillId:
+ *                 type: string
+ *               title:
+ *                 type: string
+ *               color:
+ *                 type: string
+ *               icon:
+ *                 type: string
+ *               skills:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                     icon:
+ *                       type: string
+ *     responses:
+ *       200:
+ *         description: Skill category updated successfully
+ *       400:
+ *         description: All fields are required
+ *       404:
+ *         description: Admin or skill not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/update-portfolio-skill", UpdatePortfolioSkills);
+/**
+ * @swagger
+ * /api/portfolio/delete-portfolio-skill:
+ *   post:
+ *     summary: Delete a skill category
+ *     tags:
+ *       - Portfolio (Skills)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adminId:
+ *                 type: string
+ *               skillId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Skill category deleted successfully
+ *       400:
+ *         description: Admin ID and Skill ID required
+ *       404:
+ *         description: Admin or skill not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/delete-portfolio-skill", DeletePortfolioSkills);
 /**
  * @swagger
  * /api/portfolio/save-portfolio-service:
@@ -1289,5 +1444,175 @@ router.post("/get-portfolio-messages", GetAllContactMessages);
  *         description: Server error
  */
 router.post("/delete-portfolio-message", deleteContactMessage);
-
+/**
+ * @swagger
+ * /api/portfolio/get-public-portfolio-about-by-slug/{slug}:
+ *   get:
+ *     summary: Get public portfolio About section using slug
+ *     tags:
+ *       - Public Portfolio
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: avinash
+ *         description: Portfolio slug
+ *     responses:
+ *       200:
+ *         description: About data fetched successfully
+ *       404:
+ *         description: Admin not found
+ *       500:
+ *         description: Server error
+ */
+router.get(
+  "/get-public-portfolio-about-by-slug/:slug",
+  GetPublicPortfolioAboutBySlug
+);
+/**
+ * @swagger
+ * /api/portfolio/get-public-portfolio-educations-by-slug/{slug}:
+ *   get:
+ *     summary: Get public portfolio Educations section using slug
+ *     tags:
+ *       - Public Portfolio
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: avinash
+ *     responses:
+ *       200:
+ *         description: Educations data fetched successfully
+ *       404:
+ *         description: Admin not found
+ */
+router.get(
+  "/get-public-portfolio-educations-by-slug/:slug",
+  GetPublicPortfolioEducationsBySlug
+);
+/**
+ * @swagger
+ * /api/portfolio/get-public-portfolio-experiences-by-slug/{slug}:
+ *   get:
+ *     summary: Get public portfolio Experiences section using slug
+ *     tags:
+ *       - Public Portfolio
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: avinash
+ *     responses:
+ *       200:
+ *         description: Experiences data fetched successfully
+ *       404:
+ *         description: Admin not found
+ */
+router.get(
+  "/get-public-portfolio-experiences-by-slug/:slug",
+  GetPublicPortfolioExperiencesBySlug
+);
+/**
+ * @swagger
+ * /api/portfolio/get-public-portfolio-skills-by-slug/{slug}:
+ *   get:
+ *     summary: Get public portfolio Skills section using slug
+ *     tags:
+ *       - Public Portfolio
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: avinash
+ *     responses:
+ *       200:
+ *         description: Skills data fetched successfully
+ *       404:
+ *         description: Admin not found
+ */
+router.get(
+  "/get-public-portfolio-skills-by-slug/:slug",
+  GetPublicPortfolioSkillsBySlug
+);
+/**
+ * @swagger
+ * /api/portfolio/get-public-portfolio-services-by-slug/{slug}:
+ *   get:
+ *     summary: Get public portfolio Services section using slug
+ *     tags:
+ *       - Public Portfolio
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: avinash
+ *     responses:
+ *       200:
+ *         description: Services data fetched successfully
+ *       404:
+ *         description: Admin not found
+ */
+router.get(
+  "/get-public-portfolio-services-by-slug/:slug",
+  GetPublicPortfolioServicesBySlug
+);
+/**
+ * @swagger
+ * /api/portfolio/get-public-portfolio-projects-by-slug/{slug}:
+ *   get:
+ *     summary: Get public portfolio Projects section using slug
+ *     tags:
+ *       - Public Portfolio
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: avinash
+ *     responses:
+ *       200:
+ *         description: Projects data fetched successfully
+ *       404:
+ *         description: Admin not found
+ */
+router.get(
+  "/get-public-portfolio-projects-by-slug/:slug",
+  GetPublicPortfolioProjectsBySlug
+);
+/**
+ * @swagger
+ * /api/portfolio/get-public-portfolio-contact-info-by-slug/{slug}:
+ *   get:
+ *     summary: Get public portfolio Contact Info section using slug
+ *     tags:
+ *       - Public Portfolio
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: avinash
+ *     responses:
+ *       200:
+ *         description: Contact info fetched successfully
+ *       404:
+ *         description: Admin not found
+ */
+router.get(
+  "/get-public-portfolio-contact-info-by-slug/:slug",
+  GetPublicPortfolioContactInfoBySlug
+);
 export default router;

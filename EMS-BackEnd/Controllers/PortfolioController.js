@@ -263,6 +263,8 @@ export const resetPassword = async (req, res) => {
 
     const hashed = await bcrypt.hash(newPassword, 10);
     admin.password = hashed;
+    admin.createdAt = new Date();
+
     await admin.save();
 
     return res.status(200).json({
@@ -321,6 +323,7 @@ export const updateAdmin = async (req, res) => {
     admin.email = email || admin.email;
     admin.role = role || admin.role;
     admin.status = status || admin.status;
+    admin.updatedAt = new Date();
 
     await admin.save();
 
@@ -352,6 +355,7 @@ export const toggleLockAdmin = async (req, res) => {
     if (admin.status === "active") {
       admin.failedLoginAttempts = 0;
       admin.lockUntil = undefined;
+      admin.updatedAt = new Date();
     }
     await admin.save();
 
@@ -584,7 +588,7 @@ export const SavePortfolioAbout = async (req, res) => {
       recruiters: stats?.recruiters || 0,
     };
 
-    admin.about.updatedAt = new Date();
+    admin.about.createdAt = new Date();
 
     await admin.save();
 
@@ -623,9 +627,10 @@ export const GetPortfolioAbout = async (req, res) => {
 // Portfolio Educations API
 export const AddEducation = async (req, res) => {
   try {
-    const { adminId, degree, university, period } = req.body;
+    const { adminId, degree, university, fromYear, toYear, currentlyStudying } =
+      req.body;
 
-    if (!adminId || !degree || !university || !period) {
+    if (!adminId || !degree || !university || !fromYear) {
       return res
         .status(400)
         .json({ status: "fail", message: "All fields are required" });
@@ -642,7 +647,10 @@ export const AddEducation = async (req, res) => {
       id: new mongoose.Types.ObjectId(),
       degree,
       university,
-      period,
+      fromYear,
+      toYear,
+      currentlyStudying,
+      createdAt: new Date(),
     };
 
     admin.education.push(newEducation);
@@ -665,9 +673,12 @@ export const GetPortfolioEducations = async (req, res) => {
 
     const admin = await Admin.findById(id);
 
-    const sortedEducations = (admin.education || []).sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-    );
+    const sortedEducations = (admin.education || []).sort((a, b) => {
+      // Use updatedAt if available, otherwise fall back to createdAt
+      const dateA = a.updatedAt || a.createdAt;
+      const dateB = b.updatedAt || b.createdAt;
+      return new Date(dateB) - new Date(dateA);
+    });
 
     res.status(200).json({
       status: "success",
@@ -681,9 +692,17 @@ export const GetPortfolioEducations = async (req, res) => {
 
 export const UpdateEducation = async (req, res) => {
   try {
-    const { adminId, eduId, degree, university, period } = req.body;
+    const {
+      adminId,
+      eduId,
+      degree,
+      university,
+      fromYear,
+      toYear,
+      currentlyStudying,
+    } = req.body;
 
-    if (!adminId || !eduId || !degree || !university || !period) {
+    if (!adminId || !eduId || !degree || !university || !fromYear) {
       return res
         .status(400)
         .json({ status: "fail", message: "All fields are required" });
@@ -710,7 +729,9 @@ export const UpdateEducation = async (req, res) => {
       ...admin.education[eduIndex],
       degree,
       university,
-      period,
+      fromYear,
+      toYear,
+      currentlyStudying,
       updatedAt: new Date(),
     };
 
@@ -771,9 +792,25 @@ export const DeleteEducation = async (req, res) => {
 // Portfolio Experiences API
 export const AddPortfolioExperiences = async (req, res) => {
   try {
-    const { adminId, company, role, period, project, description } = req.body;
+    const {
+      adminId,
+      company,
+      role,
+      fromYear,
+      toYear,
+      currentlyWorking,
+      project,
+      description,
+    } = req.body;
 
-    if (!adminId || !company || !role || !period || !project || !description) {
+    if (
+      !adminId ||
+      !company ||
+      !role ||
+      !fromYear ||
+      !project ||
+      !description
+    ) {
       return res
         .status(400)
         .json({ status: "fail", message: "All fields are required" });
@@ -790,7 +827,9 @@ export const AddPortfolioExperiences = async (req, res) => {
       id: new mongoose.Types.ObjectId(),
       company,
       role,
-      period,
+      perfromYear,
+      toYear,
+      currentlyWorking,
       project,
       description,
       createdAt: new Date(),
@@ -816,9 +855,12 @@ export const GetPortfolioExperiences = async (req, res) => {
 
     const admin = await Admin.findById(id);
 
-    const sortedExperiences = (admin.experience || []).sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-    );
+    const sortedExperiences = (admin.experience || []).sort((a, b) => {
+      // Use updatedAt if available, otherwise fall back to createdAt
+      const dateA = a.updatedAt || a.createdAt;
+      const dateB = b.updatedAt || b.createdAt;
+      return new Date(dateB) - new Date(dateA);
+    });
 
     res.status(200).json({
       status: "success",
@@ -832,15 +874,24 @@ export const GetPortfolioExperiences = async (req, res) => {
 
 export const UpdatePortfolioExperiences = async (req, res) => {
   try {
-    const { adminId, expId, company, role, period, project, description } =
-      req.body;
+    const {
+      adminId,
+      expId,
+      company,
+      role,
+      fromYear,
+      toYear,
+      currentlyWorking,
+      project,
+      description,
+    } = req.body;
 
     if (
       !adminId ||
       !expId ||
       !company ||
       !role ||
-      !period ||
+      !fromYear ||
       !project ||
       !description
     ) {
@@ -870,7 +921,9 @@ export const UpdatePortfolioExperiences = async (req, res) => {
       ...admin.experience[expIndex],
       company,
       role,
-      period,
+      fromYear,
+      toYear,
+      currentlyWorking,
       project,
       description,
       updatedAt: new Date(),
@@ -1075,6 +1128,155 @@ export const DeletePortfolioServices = async (req, res) => {
     });
   } catch (err) {
     console.error("Delete Services Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+// Portfolio Skills API
+export const AddPortfolioSkills = async (req, res) => {
+  try {
+    const { adminId, title, color, icon, skills } = req.body;
+
+    if (!adminId || !title || !color || !icon || !skills) {
+      return res
+        .status(400)
+        .json({ status: "fail", message: "All fields are required" });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const newSkills = {
+      id: new mongoose.Types.ObjectId(),
+      title,
+      color,
+      icon,
+      skills,
+      createdAt: new Date(),
+    };
+
+    admin.skills.push(newSkills);
+    await admin.save();
+
+    res.status(201).json({
+      status: "success",
+      message: "Skills added successfully",
+      data: { newSkills: admin.skills },
+    });
+  } catch (err) {
+    console.error("Add Projects Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const GetPortfolioSkills = async (req, res) => {
+  try {
+    const { id } = req.body;
+
+    const admin = await Admin.findById(id);
+
+    const sortedSkills = admin.skills || [];
+
+    res.status(200).json({
+      status: "success",
+      message: "Skills data fetched successfully",
+      data: { skills: sortedSkills || [] },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const UpdatePortfolioSkills = async (req, res) => {
+  try {
+    const { adminId, skillId, title, color, icon, skills } = req.body;
+
+    if (!adminId || !skillId || !title || !color || !icon || !skills) {
+      return res
+        .status(400)
+        .json({ status: "fail", message: "All fields are required" });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const skillsIndex = admin.skills.findIndex(
+      (e) => e._id.toString() === skillId
+    );
+    if (skillsIndex === -1) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Skills not found" });
+    }
+
+    // Update fields
+    admin.skills[skillsIndex] = {
+      ...admin.skills[skillsIndex],
+      title,
+      color,
+      icon,
+      skills,
+      updatedAt: new Date(),
+    };
+
+    await admin.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Skill updated successfully",
+      data: admin.skills[skillsIndex],
+    });
+  } catch (err) {
+    console.error("Update skill Error:", err);
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const DeletePortfolioSkills = async (req, res) => {
+  try {
+    const { adminId, skillId } = req.body;
+
+    if (!adminId || !skillId) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Admin ID and Skill ID are required",
+      });
+    }
+
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Admin not found" });
+    }
+
+    const skillsIndex = admin.skills.findIndex(
+      (e) => e._id.toString() === skillId
+    );
+    if (skillsIndex === -1) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Skills not found" });
+    }
+
+    const removedSkills = admin.projects.splice(skillsIndex, 1); // remove from array
+    await admin.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Skills deleted successfully",
+      data: removedSkills[0],
+    });
+  } catch (err) {
+    console.error("Delete Skills Error:", err);
     res.status(500).json({ status: "fail", message: err.message });
   }
 };
@@ -1520,5 +1722,187 @@ export const deleteContactMessage = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ status: "fail", message: error.message });
+  }
+};
+
+// Public View Using Slug Api
+export const GetPublicPortfolioAboutBySlug = async (req, res) => {
+  try {
+    const slug = req.params.slug;
+
+    const admin = await Admin.findOne({ slug });
+
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found for this slug",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "About & Skills data fetched successfully",
+      data: { about: admin.about },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const GetPublicPortfolioEducationsBySlug = async (req, res) => {
+  try {
+    const slug = req.params.slug;
+
+    const admin = await Admin.findOne({ slug });
+
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found for this slug",
+      });
+    }
+
+    const sortedEducations = (admin.education || []).sort((a, b) => {
+      // Use updatedAt if available, otherwise fall back to createdAt
+      const dateA = a.updatedAt || a.createdAt;
+      const dateB = b.updatedAt || b.createdAt;
+      return new Date(dateB) - new Date(dateA);
+    });
+
+    res.status(200).json({
+      status: "success",
+      message: "Educations data fetched successfully",
+      data: { educations: sortedEducations },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const GetPublicPortfolioExperiencesBySlug = async (req, res) => {
+  try {
+    const slug = req.params.slug;
+
+    const admin = await Admin.findOne({ slug });
+
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found for this slug",
+      });
+    }
+
+    const sortedExperiences = (admin.experience || []).sort((a, b) => {
+      // Use updatedAt if available, otherwise fall back to createdAt
+      const dateA = a.updatedAt || a.createdAt;
+      const dateB = b.updatedAt || b.createdAt;
+      return new Date(dateB) - new Date(dateA);
+    });
+
+    res.status(200).json({
+      status: "success",
+      message: "Experiences data fetched successfully",
+      data: { experiences: sortedExperiences },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const GetPublicPortfolioSkillsBySlug = async (req, res) => {
+  try {
+    const slug = req.params.slug;
+
+    const admin = await Admin.findOne({ slug });
+
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found for this slug",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "About & Skills data fetched successfully",
+      data: { skills: admin.skills || {} },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const GetPublicPortfolioServicesBySlug = async (req, res) => {
+  try {
+    const slug = req.params.slug;
+
+    const admin = await Admin.findOne({ slug });
+
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found for this slug",
+      });
+    }
+
+    console.log(admin);
+
+    const sortedServices = admin.services || [];
+
+    res.status(200).json({
+      status: "success",
+      message: "Services data fetched successfully",
+      data: { services: sortedServices },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const GetPublicPortfolioProjectsBySlug = async (req, res) => {
+  try {
+    const slug = req.params.slug;
+
+    const admin = await Admin.findOne({ slug });
+
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found for this slug",
+      });
+    }
+
+    const sortedProjects = admin.projects || [];
+
+    res.status(200).json({
+      status: "success",
+      message: "Projects data fetched successfully",
+      data: { projects: sortedProjects },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const GetPublicPortfolioContactInfoBySlug = async (req, res) => {
+  try {
+    const slug = req.params.slug;
+
+    const admin = await Admin.findOne({ slug });
+
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found for this slug",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Contact Info data fetched successfully",
+      data: { contactInfo: admin.contactInfo || {} },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
   }
 };
