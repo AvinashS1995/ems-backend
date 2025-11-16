@@ -29,6 +29,7 @@ app.use(
       "http://localhost:4200",
       "https://ems-project-kappa.vercel.app",
       "https://weather-forecast-dashboard-theta.vercel.app",
+      "https://personal-portfolio-eight-rho-54.vercel.app",
     ],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
