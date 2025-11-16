@@ -59,102 +59,108 @@ export const createAdmin = async (req, res) => {
 
 export const Login = async (req, res) => {
   try {
-    const { password } = req.body;
+    const { email, password } = req.body;
     const ip = req.ip;
 
-    if (!password) {
+    // ✅ Validate input
+    if (!email || !password) {
       return res.status(400).json({
         status: "fail",
-        message: "Password is required",
+        message: "Email and password are required",
       });
     }
 
-    const admins = await Admin.find({ status: "active" }).select("+password");
+    // ✅ Find the admin by email
+    const admin = await Admin.findOne({ email }).select("+password");
 
-    for (const admin of admins) {
-      const isMatch = await bcrypt.compare(password, admin.password);
+    if (!admin) {
+      return res.status(401).json({
+        status: "fail",
+        message: "Invalid email or password",
+      });
+    }
 
-      if (isMatch) {
-        // 🔐 Lock Check
-        if (admin.lockUntil && admin.lockUntil > Date.now()) {
-          const remaining = Math.ceil((admin.lockUntil - Date.now()) / 60000);
-          return res.status(403).json({
-            status: "fail",
-            message: `Account locked. Try again after ${remaining} minute(s).`,
-          });
-        }
+    // ✅ Check password
+    const isMatch = await bcrypt.compare(password, admin.password);
+    if (!isMatch) {
+      // Increment failed attempts
+      admin.failedLoginAttempts = (admin.failedLoginAttempts || 0) + 1;
 
-        admin.isLoggedIn = true;
-        admin.failedLoginAttempts = 0;
-        admin.lockUntil = undefined;
+      if (admin.failedLoginAttempts >= 3) {
+        admin.lockUntil = Date.now() + 15 * 60 * 1000; // lock for 15 mins
+        admin.status = "locked";
+      }
 
-        let newIpDetected = false;
-        if (admin.lastLoginIp && admin.lastLoginIp !== ip) {
-          if (!admin.suspiciousIps.includes(ip)) {
-            admin.suspiciousIps.push(ip);
-            newIpDetected = true;
-          }
-        }
+      await admin.save();
 
-        admin.lastLoginIp = ip;
-        await admin.save();
+      const remaining = Math.max(3 - admin.failedLoginAttempts, 0);
+      return res.status(401).json({
+        status: "fail",
+        message: `Incorrect password. You have ${remaining} attempt${
+          remaining === 1 ? "" : "s"
+        } remaining.`,
+      });
+    }
 
-        if (newIpDetected) {
-          await transporter.sendMail({
-            from: `"Security Alert" <${process.env.ADMIN_EMAIL}>`,
-            to: admin.email,
-            subject: "⚠️ New IP Login Detected",
-            html: `
-              <h3>Hello ${admin.fullName},</h3>
-              <p>New login detected from IP: <strong>${ip}</strong></p>
-              <p>If this was you, ignore. Otherwise, reset your password immediately.</p>
-            `,
-          });
-        }
+    // ✅ Check if account is locked
+    if (admin.lockUntil && admin.lockUntil > Date.now()) {
+      const remaining = Math.ceil((admin.lockUntil - Date.now()) / 60000);
+      return res.status(403).json({
+        status: "fail",
+        message: `Account locked. Try again after ${remaining} minute(s).`,
+      });
+    }
 
-        // ✅ Generate Tokens via helper
-        const { accessToken, refreshToken } = generateTokens(admin);
+    // ✅ Reset failed attempts and mark logged in
+    admin.failedLoginAttempts = 0;
+    admin.lockUntil = undefined;
+    admin.status = "active";
+    admin.isLoggedIn = true;
 
-        return res.status(200).json({
-          status: "success",
-          message: "Login successful",
-          tokens: { accessToken, refreshToken },
-          admin: {
-            id: admin._id,
-            fullName: admin.fullName,
-            email: admin.email,
-            role: admin.role,
-            lastLoginIp: admin.lastLoginIp,
-          },
-        });
-      } else {
-        admin.failedLoginAttempts = (admin.failedLoginAttempts || 0) + 1;
-
-        if (admin.failedLoginAttempts >= 3) {
-          admin.lockUntil = Date.now() + 15 * 60 * 1000;
-          admin.status = "locked";
-          await admin.save();
-
-          return res.status(403).json({
-            status: "fail",
-            message: `Account locked due to too many failed attempts. Try again after 15 minutes.`,
-          });
-        }
-
-        const remaining = 3 - admin.failedLoginAttempts;
-        await admin.save();
-
-        return res.status(401).json({
-          status: "fail",
-          message: `Incorrect password. You have ${remaining} attempt${
-            remaining === 1 ? "" : "s"
-          } remaining.`,
-        });
+    // ✅ IP detection
+    let newIpDetected = false;
+    if (admin.lastLoginIp && admin.lastLoginIp !== ip) {
+      if (!admin.suspiciousIps.includes(ip)) {
+        admin.suspiciousIps.push(ip);
+        newIpDetected = true;
       }
     }
+
+    admin.lastLoginIp = ip;
+    await admin.save();
+
+    // ✅ Send IP alert if needed
+    if (newIpDetected) {
+      await transporter.sendMail({
+        from: `"Security Alert" <${process.env.ADMIN_EMAIL}>`,
+        to: admin.email,
+        subject: "⚠️ New IP Login Detected",
+        html: `
+          <h3>Hello ${admin.fullName},</h3>
+          <p>New login detected from IP: <strong>${ip}</strong></p>
+          <p>If this was you, ignore. Otherwise, reset your password immediately.</p>
+        `,
+      });
+    }
+
+    // ✅ Generate tokens
+    const { accessToken, refreshToken } = generateTokens(admin);
+
+    return res.status(200).json({
+      status: "success",
+      message: `${admin.role} Login successful`,
+      tokens: { accessToken, refreshToken },
+      admin: {
+        id: admin._id,
+        fullName: admin.fullName,
+        email: admin.email,
+        role: admin.role,
+        lastLoginIp: admin.lastLoginIp,
+      },
+    });
   } catch (error) {
     console.error("Login Error:", error);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ status: "fail", message: "Server error" });
   }
 };
 
@@ -311,8 +317,7 @@ export const GetAdminUserList = async (req, res) => {
 
 export const updateAdmin = async (req, res) => {
   try {
-    const { id } = req.body;
-    const { fullName, email, role, status } = req.body;
+    const { id, fullName, email, password, role } = req.body;
 
     const admin = await Admin.findById(id);
     if (!admin) {
@@ -322,7 +327,7 @@ export const updateAdmin = async (req, res) => {
     admin.fullName = fullName || admin.fullName;
     admin.email = email || admin.email;
     admin.role = role || admin.role;
-    admin.status = status || admin.status;
+    admin.password = password || admin.password;
     admin.updatedAt = new Date();
 
     await admin.save();
@@ -335,7 +340,7 @@ export const updateAdmin = async (req, res) => {
 
 export const deleteAdmin = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.body;
     const admin = await Admin.findByIdAndDelete(id);
     if (!admin) return res.status(404).json({ message: "Admin not found" });
 
@@ -546,11 +551,9 @@ export const getDashboardStats = async (req, res) => {
 // Portfolio About API
 export const SavePortfolioAbout = async (req, res) => {
   try {
-    const adminId = req.body.id;
+    const { adminId, name, title, bio, bio2, profileImage, resumeUrl, stats } =
+      req.body;
 
-    const { name, title, bio, bio2, profileImage, resumeUrl, stats } = req.body;
-
-    // Required fields
     if (!name || !title || !bio) {
       return res.status(400).json({
         status: "fail",
@@ -558,22 +561,12 @@ export const SavePortfolioAbout = async (req, res) => {
       });
     }
 
-    // Find admin
     const admin = await Admin.findById(adminId);
-    // if (!admin) {
-    //   return res.status(404).json({
-    //     status: "fail",
-    //     message: "Admin not found",
-    //   });
-    // }
 
-    // Detect create vs update
     const isNew = !admin.about || !admin.about.name;
 
-    // Initialize about field if empty
     if (!admin.about) admin.about = {};
 
-    // Assign values
     admin.about.name = name;
     admin.about.title = title;
     admin.about.bio = bio;
@@ -581,14 +574,17 @@ export const SavePortfolioAbout = async (req, res) => {
     admin.about.profileImage = profileImage || "";
     admin.about.resumeUrl = resumeUrl || "";
 
-    // Stats
     admin.about.stats = {
       experience: stats?.experience || 0,
       clients: stats?.clients || 0,
       recruiters: stats?.recruiters || 0,
     };
 
-    admin.about.createdAt = new Date();
+    // ⭐ FIX: only create createdAt once
+    if (!admin.about.createdAt) {
+      admin.about.createdAt = new Date();
+    }
+    admin.about.updatedAt = new Date();
 
     await admin.save();
 
