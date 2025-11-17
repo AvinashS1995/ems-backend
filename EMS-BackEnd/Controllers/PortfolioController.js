@@ -8,6 +8,7 @@ import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { generateTokens } from "../common/generateTokens.js";
 import mongoose from "mongoose";
+import transporter from "../mail/transporter.js";
 
 dotenv.config({ path: "./.env" });
 
@@ -62,63 +63,45 @@ export const Login = async (req, res) => {
     const { email, password } = req.body;
     const ip = req.ip;
 
-    // ✅ Validate input
     if (!email || !password) {
-      return res.status(400).json({
-        status: "fail",
-        message: "Email and password are required",
-      });
+      return res
+        .status(400)
+        .json({ status: "fail", message: "Email and password are required" });
     }
 
-    // ✅ Find the admin by email
     const admin = await Admin.findOne({ email }).select("+password");
 
     if (!admin) {
-      return res.status(401).json({
-        status: "fail",
-        message: "Invalid email or password",
-      });
+      return res
+        .status(401)
+        .json({ status: "fail", message: "Invalid email or password" });
     }
 
-    // ✅ Check password
-    const isMatch = await bcrypt.compare(password, admin.password);
-    if (!isMatch) {
-      // Increment failed attempts
-      admin.failedLoginAttempts = (admin.failedLoginAttempts || 0) + 1;
-
-      if (admin.failedLoginAttempts >= 3) {
-        admin.lockUntil = Date.now() + 15 * 60 * 1000; // lock for 15 mins
-        admin.status = "locked";
-      }
-
-      await admin.save();
-
-      const remaining = Math.max(3 - admin.failedLoginAttempts, 0);
-      return res.status(401).json({
-        status: "fail",
-        message: `Incorrect password. You have ${remaining} attempt${
-          remaining === 1 ? "" : "s"
-        } remaining.`,
-      });
-    }
-
-    // ✅ Check if account is locked
     if (admin.lockUntil && admin.lockUntil > Date.now()) {
-      const remaining = Math.ceil((admin.lockUntil - Date.now()) / 60000);
+      const mins = Math.ceil((admin.lockUntil - Date.now()) / 60000);
       return res.status(403).json({
         status: "fail",
-        message: `Account locked. Try again after ${remaining} minute(s).`,
+        message: `Account locked. Try again after ${mins} minute(s).`,
       });
     }
 
-    // ✅ Reset failed attempts and mark logged in
-    admin.failedLoginAttempts = 0;
-    admin.lockUntil = undefined;
-    admin.status = "active";
+    const isMatch = await bcrypt.compare(password, admin.password);
+    if (!isMatch) {
+      await admin.incrementLoginAttempts();
+      const remaining = Math.max(3 - admin.failedLoginAttempts, 0);
+
+      return res.status(401).json({
+        status: "fail",
+        message: `Incorrect password. You have ${remaining} attempt(s) remaining.`,
+      });
+    }
+
+    await admin.resetLoginAttempts();
     admin.isLoggedIn = true;
 
-    // ✅ IP detection
+    // IP detection
     let newIpDetected = false;
+
     if (admin.lastLoginIp && admin.lastLoginIp !== ip) {
       if (!admin.suspiciousIps.includes(ip)) {
         admin.suspiciousIps.push(ip);
@@ -129,21 +112,18 @@ export const Login = async (req, res) => {
     admin.lastLoginIp = ip;
     await admin.save();
 
-    // ✅ Send IP alert if needed
     if (newIpDetected) {
+      // email alert
       await transporter.sendMail({
         from: `"Security Alert" <${process.env.ADMIN_EMAIL}>`,
         to: admin.email,
         subject: "⚠️ New IP Login Detected",
-        html: `
-          <h3>Hello ${admin.fullName},</h3>
-          <p>New login detected from IP: <strong>${ip}</strong></p>
-          <p>If this was you, ignore. Otherwise, reset your password immediately.</p>
-        `,
+        html: `<h3>Hello ${admin.fullName},</h3>
+               <p>New login detected from IP: <strong>${ip}</strong></p>
+               <p>If this was not you, please reset your password.</p>`,
       });
     }
 
-    // ✅ Generate tokens
     const { accessToken, refreshToken } = generateTokens(admin);
 
     return res.status(200).json({
@@ -155,12 +135,11 @@ export const Login = async (req, res) => {
         fullName: admin.fullName,
         email: admin.email,
         role: admin.role,
-        lastLoginIp: admin.lastLoginIp,
       },
     });
   } catch (error) {
     console.error("Login Error:", error);
-    return res.status(500).json({ status: "fail", message: "Server error" });
+    res.status(500).json({ status: "fail", message: error.message });
   }
 };
 
@@ -168,32 +147,24 @@ export const refreshToken = async (req, res) => {
   try {
     const { refreshToken } = req.body;
 
-    if (!refreshToken) {
-      return res.status(400).json({
-        status: "fail",
-        message: "Refresh token is required",
-      });
-    }
+    if (!refreshToken)
+      return res
+        .status(400)
+        .json({ status: "fail", message: "Refresh token required" });
 
-    // Verify token validity
     jwt.verify(refreshToken, JWT_SECRET_KEY, async (err, decoded) => {
-      if (err) {
+      if (err)
         return res.status(403).json({
           status: "fail",
           message: "Invalid or expired refresh token. Please login again.",
         });
-      }
 
-      // Find admin by ID
       const admin = await Admin.findById(decoded.id);
-      if (!admin || admin.status !== "active") {
-        return res.status(404).json({
-          status: "fail",
-          message: "Admin not found or inactive",
-        });
-      }
+      if (!admin)
+        return res
+          .status(404)
+          .json({ status: "fail", message: "Admin not found" });
 
-      // Generate a new short-lived access token
       const newAccessToken = jwt.sign(
         { id: admin._id, role: admin.role },
         JWT_SECRET_KEY,
@@ -202,17 +173,11 @@ export const refreshToken = async (req, res) => {
 
       return res.status(200).json({
         status: "success",
-        message: "Access token refreshed successfully",
         accessToken: newAccessToken,
       });
     });
   } catch (error) {
-    console.error("Refresh Token Error:", error);
-    return res.status(500).json({
-      status: "fail",
-      message: "Server error",
-      error: error.message,
-    });
+    res.status(500).json({ status: "fail", message: error.message });
   }
 };
 
@@ -228,11 +193,7 @@ export const LogOut = async (req, res) => {
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, JWT_SECRET_KEY);
 
-    if (!decoded?.id) {
-      return res.status(400).json({ status: "fail", message: "Invalid token" });
-    }
-
-    // Blacklist the access token to prevent reuse
+    // Blacklist
     blacklistedTokens.add(token);
 
     await Admin.findByIdAndUpdate(decoded.id, {
@@ -242,11 +203,11 @@ export const LogOut = async (req, res) => {
 
     return res.status(200).json({
       status: "success",
-      message: "Logout successful. Token invalidated.",
+      message: "Logout successful",
     });
   } catch (error) {
     console.error("Logout Error:", error);
-    return res.status(500).json({ status: "fail", message: "Server error" });
+    return res.status(500).json({ status: "fail", message: error.message });
   }
 };
 
