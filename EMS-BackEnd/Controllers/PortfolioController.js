@@ -9,6 +9,7 @@ import dotenv from "dotenv";
 import { generateTokens } from "../common/generateTokens.js";
 import mongoose from "mongoose";
 import transporter from "../mail/transporter.js";
+import { getPresignedUrl } from "../storage/s3.config.js";
 
 dotenv.config({ path: "./.env" });
 
@@ -512,7 +513,7 @@ export const getDashboardStats = async (req, res) => {
 // Portfolio About API
 export const SavePortfolioAbout = async (req, res) => {
   try {
-    const { adminId, name, title, bio, bio2, profileImage, resumeUrl, stats } =
+    const { adminId, name, title, bio, bio2, profileImage, resumeFile, stats } =
       req.body;
 
     if (!name || !title || !bio) {
@@ -532,8 +533,16 @@ export const SavePortfolioAbout = async (req, res) => {
     admin.about.title = title;
     admin.about.bio = bio;
     admin.about.bio2 = bio2 || "";
-    admin.about.profileImage = profileImage || "";
-    admin.about.resumeUrl = resumeUrl || "";
+    // admin.about.profileImage = profileImage || "";
+    // admin.about.resumeUrl = resumeUrl || "";
+
+    if (profileImage) {
+      admin.about.profileImage = profileImage;
+    }
+
+    if (resumeFile) {
+      admin.about.resumeFile = resumeFile;
+    }
 
     admin.about.stats = {
       experience: stats?.experience || 0,
@@ -571,13 +580,47 @@ export const GetPortfolioAbout = async (req, res) => {
 
     const admin = await Admin.findById(adminId);
 
-    res.status(200).json({
+    if (!admin || !admin.about) {
+      return res.status(404).json({
+        status: "fail",
+        message: "About section not found",
+      });
+    }
+
+    const about = admin.about.toObject(); // convert mongoose document to plain object
+
+    // ----------------------------------------------------
+    // ✅ PROFILE IMAGE (Generate presigned URL)
+    // ----------------------------------------------------
+    if (about.profileImage) {
+      const fileUrl = about.profileImage; // stored fileUrl
+      const presignedUrl = await getPresignedUrl(fileUrl, 3600);
+      about.profileImage = presignedUrl;
+    } else {
+      about.profileImage = null;
+    }
+
+    // ----------------------------------------------------
+    // ✅ RESUME FILE (Generate presigned URL)
+    // ----------------------------------------------------
+    if (about.resumeFile) {
+      const resumeUrl = about.resumeFile;
+      const resumePresignedUrl = await getPresignedUrl(resumeUrl, 3600);
+      about.resumeFile = resumePresignedUrl;
+    } else {
+      about.resumeFile = null;
+    }
+
+    return res.status(200).json({
       status: "success",
       message: "About data fetched successfully",
-      data: { about: admin.about },
+      data: { about: about },
     });
-  } catch (err) {
-    res.status(500).json({ status: "fail", message: err.message });
+  } catch (error) {
+    return res.status(500).json({
+      status: "fail",
+      message: error.message,
+    });
   }
 };
 
@@ -1305,7 +1348,20 @@ export const GetPortfolioProjects = async (req, res) => {
 
     const admin = await Admin.findById(id);
 
-    const sortedProjects = admin.projects || [];
+    const projects = admin.projects.map((project) => project.toObject());
+
+    // Generate Pre-Signed URLs for each project's image
+    const sortedProjects = await Promise.all(
+      projects.map(async (proj) => {
+        if (proj.image) {
+          const presignedUrl = await getPresignedUrl(proj.image, 3600);
+          proj.image = presignedUrl;
+        } else {
+          proj.image = null;
+        }
+        return proj;
+      })
+    );
 
     res.status(200).json({
       status: "success",
@@ -1331,16 +1387,7 @@ export const UpdatePortfolioProjects = async (req, res) => {
       previewLink,
     } = req.body;
 
-    if (
-      !adminId ||
-      !projectId ||
-      !title ||
-      !category ||
-      !role ||
-      !image ||
-      !codeLink ||
-      !previewLink
-    ) {
+    if (!adminId || !projectId || !title || !category || !role || !image) {
       return res
         .status(400)
         .json({ status: "fail", message: "All fields are required" });
@@ -1365,10 +1412,15 @@ export const UpdatePortfolioProjects = async (req, res) => {
     // Update fields
     admin.projects[projectsIndex] = {
       ...admin.projects[projectsIndex],
+      adminId,
+      projectId,
       title,
-      icon,
-      color,
+      category,
+      role,
+      image,
       description,
+      codeLink,
+      previewLink,
       updatedAt: new Date(),
     };
 
@@ -1627,6 +1679,40 @@ export const SaveContactMessage = async (req, res) => {
   }
 };
 
+// export const SubmitContactMessages = async (req, res) => {
+//   try {
+//     const slug = req.params.slug;
+
+//     const { name, email, subject, message } = req.body;
+
+//     const admin = await Admin.findOne({ slug });
+//     if (!admin) {
+//       return res
+//         .status(404)
+//         .json({ status: "error", message: "User not found" });
+//     }
+
+//     const newMessage = {
+//       name: name,
+//       email: email,
+//       subject: subject,
+//       message: message,
+//       createdAt: new Date(),
+//     };
+
+//     admin.messages.push(newMessage);
+//     await admin.save();
+
+//     return res.json({
+//       status: "success",
+//       message: "Message sent successfully",
+//       data: { newMessage },
+//     });
+//   } catch (error) {
+//     return res.status(500).json({ status: "error", message: error.message });
+//   }
+// };
+
 export const GetAllContactMessages = async (req, res) => {
   try {
     const { id } = req.body;
@@ -1640,9 +1726,7 @@ export const GetAllContactMessages = async (req, res) => {
       });
     }
 
-    const sortedMessages = admin.messages.sort(
-      (a, b) => b.createdAt - a.createdAt
-    );
+    const sortedMessages = admin.messages.reverse();
 
     res.status(200).json({
       status: "success",
@@ -1654,7 +1738,7 @@ export const GetAllContactMessages = async (req, res) => {
   }
 };
 
-export const deleteContactMessage = async (req, res) => {
+export const DeleteContactMessage = async (req, res) => {
   try {
     const { adminId, messageId } = req.body;
 

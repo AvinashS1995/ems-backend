@@ -8,7 +8,7 @@ import {
   AddPortfolioSkills,
   createAdmin,
   deleteAdmin,
-  deleteContactMessage,
+  DeleteContactMessage,
   DeleteEducation,
   DeletePortfolioContactInfo,
   DeletePortfolioExperiences,
@@ -1443,7 +1443,7 @@ router.post("/get-portfolio-messages", GetAllContactMessages);
  *       500:
  *         description: Server error
  */
-router.post("/delete-portfolio-message", deleteContactMessage);
+router.post("/delete-portfolio-message", DeleteContactMessage);
 /**
  * @swagger
  * /api/portfolio/get-public-portfolio-about-by-slug/{slug}:

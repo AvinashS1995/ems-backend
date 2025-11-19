@@ -13,7 +13,7 @@ const AboutSchema = new mongoose.Schema({
   bio: String,
   bio2: String,
   profileImage: String,
-  resumeUrl: String,
+  resumeFile: String,
   stats: StatsSchema,
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
   createdAt: { type: Date },
@@ -154,9 +154,64 @@ const MessageSchema = new mongoose.Schema({
 
 const Messages = mongoose.model("Portfolio-Message", MessageSchema);
 
+const locationSchema = new mongoose.Schema(
+  {
+    adminId: { type: mongoose.Schema.Types.ObjectId, ref: "Admin-User" },
+    ip: String,
+    country: String,
+    region: String,
+    city: String,
+    lat: Number,
+    lng: Number,
+    timezone: String,
+  },
+  { timestamps: true }
+);
+
+const Location = mongoose.model("Admin-Location", locationSchema);
+
+const loginHistorySchema = new mongoose.Schema(
+  {
+    adminId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Admin",
+      required: true,
+    },
+    ip: String,
+    userAgent: String,
+    device: String,
+    os: String,
+    browser: String,
+    location: locationSchema,
+    sessionId: String,
+    loggedInAt: { type: Date, default: Date.now },
+  },
+  { timestamps: true }
+);
+
+const LoginHistory = mongoose.model("Admin-Login-History", loginHistorySchema);
+
+const activitySchema = new mongoose.Schema(
+  {
+    adminId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Admin",
+      required: true,
+    },
+    action: { type: String, required: true },
+    description: String,
+    ip: String,
+    userAgent: String,
+    device: String,
+    status: { type: String, enum: ["success", "failed"], default: "success" },
+  },
+  { timestamps: true }
+);
+
+const Activity = mongoose.model("Admin-Activity-Log", activitySchema);
+
 const adminSchema = new mongoose.Schema({
   username: { type: String, unique: true, trim: true },
-  // 👇 NEW: SEO-friendly slug for portfolio URL
   slug: { type: String, unique: true, trim: true },
   fullName: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true },
@@ -165,19 +220,14 @@ const adminSchema = new mongoose.Schema({
     type: String,
   },
   failedLoginAttempts: { type: Number, default: 0 },
-  status: { type: String, default: "active" },
   lockUntil: { type: Date },
-
-  lastLoginIp: { type: String },
-  suspiciousIps: { type: [String], default: [] },
-  activities: [
-    {
-      action: String,
-      ip: String,
-      timestamp: { type: Date, default: Date.now },
-    },
-  ],
+  status: { type: String, default: "active" },
   isLoggedIn: { type: Boolean, default: false },
+  lastLoginIp: { type: String },
+  lastLoginAt: { type: Date },
+  suspiciousIps: { type: [String], default: [] },
+  loginHistory: [loginHistorySchema],
+  activities: [activitySchema],
   about: AboutSchema,
   contactInfo: ContactInfoSchema,
   services: [ServiceSchema],
