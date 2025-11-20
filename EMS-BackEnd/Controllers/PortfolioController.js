@@ -10,6 +10,13 @@ import { generateTokens } from "../common/generateTokens.js";
 import mongoose from "mongoose";
 import transporter from "../mail/transporter.js";
 import { getPresignedUrl } from "../storage/s3.config.js";
+import {
+  addActivity,
+  addLoginHistory,
+  extractClientInfo,
+  fetchLocation,
+  saveLocation,
+} from "../common/loginSecurity.js";
 
 dotenv.config({ path: "./.env" });
 
@@ -20,31 +27,45 @@ const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
 export const createAdmin = async (req, res) => {
   try {
     const { fullName, email, role, password } = req.body;
+    const client = extractClientInfo(req);
 
-    // Validate Required Fields
     if (!fullName || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "fields are required",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "fields are required" });
     }
 
-    // Check if email already exists
     const existingEmail = await Admin.findOne({ email });
     if (existingEmail) {
+      // log failed creation
+      await addActivity(
+        null,
+        "Admin Create Failed",
+        `Email ${email} already exists`,
+        client,
+        "failed"
+      );
+
       return res.status(409).json({
         success: false,
         message: "Email already registered",
       });
     }
 
-    // Create Admin → username auto-generates from model hook
     const admin = await Admin.create({
       fullName,
       email,
       password,
-      role: role,
+      role,
     });
+
+    // SUCCESS ACTIVITY
+    await addActivity(
+      admin,
+      "Admin Created",
+      `New admin created with role: ${role}`,
+      client
+    );
 
     return res.status(201).json({
       status: "success",
@@ -52,80 +73,83 @@ export const createAdmin = async (req, res) => {
       data: { admin },
     });
   } catch (error) {
-    return res.status(500).json({
-      status: "fail",
-      error: error.message,
-    });
+    res.status(500).json({ status: "fail", error: error.message });
   }
 };
 
 export const Login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const ip = req.ip;
+    const client = extractClientInfo(req);
 
     if (!email || !password) {
-      return res
-        .status(400)
-        .json({ status: "fail", message: "Email and password are required" });
+      return res.status(400).json({
+        status: "fail",
+        message: "Email and password required",
+      });
     }
 
     const admin = await Admin.findOne({ email }).select("+password");
 
     if (!admin) {
+      await addActivity(
+        null,
+        "Login Failed",
+        "Invalid email",
+        client,
+        "failed"
+      );
       return res
         .status(401)
         .json({ status: "fail", message: "Invalid email or password" });
     }
 
+    // Check for lock
     if (admin.lockUntil && admin.lockUntil > Date.now()) {
-      const mins = Math.ceil((admin.lockUntil - Date.now()) / 60000);
       return res.status(403).json({
         status: "fail",
-        message: `Account locked. Try again after ${mins} minute(s).`,
+        message: `Account locked. Try again later`,
       });
     }
 
-    const isMatch = await bcrypt.compare(password, admin.password);
+    const isMatch = await admin.comparePassword(password);
     if (!isMatch) {
       await admin.incrementLoginAttempts();
-      const remaining = Math.max(3 - admin.failedLoginAttempts, 0);
+      await addActivity(
+        admin,
+        "Login Failed",
+        "Incorrect password",
+        client,
+        "failed"
+      );
 
       return res.status(401).json({
         status: "fail",
-        message: `Incorrect password. You have ${remaining} attempt(s) remaining.`,
+        message: "Incorrect password",
       });
     }
 
+    // SUCCESS LOGIN
     await admin.resetLoginAttempts();
     admin.isLoggedIn = true;
 
-    // IP detection
-    let newIpDetected = false;
+    // SESSION ID
+    const sessionId = `${admin._id}-${Date.now()}`;
 
-    if (admin.lastLoginIp && admin.lastLoginIp !== ip) {
-      if (!admin.suspiciousIps.includes(ip)) {
-        admin.suspiciousIps.push(ip);
-        newIpDetected = true;
-      }
-    }
+    // SAVE LOGIN HISTORY (without location first)
+    await addLoginHistory(admin, client, sessionId);
 
-    admin.lastLoginIp = ip;
-    await admin.save();
+    // FETCH GEO IP
+    const geoLocation = await fetchLocation(client.ip);
 
-    if (newIpDetected) {
-      // email alert
-      await transporter.sendMail({
-        from: `"Security Alert" <${process.env.ADMIN_EMAIL}>`,
-        to: admin.email,
-        subject: "⚠️ New IP Login Detected",
-        html: `<h3>Hello ${admin.fullName},</h3>
-               <p>New login detected from IP: <strong>${ip}</strong></p>
-               <p>If this was not you, please reset your password.</p>`,
-      });
-    }
+    // SAVE LOCATION INSIDE LAST loginHistory
+    await saveLocation(admin, geoLocation);
+
+    // SAVE ACTIVITY
+    await addActivity(admin, "Login Success", "Logged in successfully", client);
 
     const { accessToken, refreshToken } = generateTokens(admin);
+    await admin.save();
 
     return res.status(200).json({
       status: "success",
@@ -139,7 +163,6 @@ export const Login = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Login Error:", error);
     res.status(500).json({ status: "fail", message: error.message });
   }
 };
@@ -184,30 +207,30 @@ export const refreshToken = async (req, res) => {
 
 export const LogOut = async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer ")) {
+    const client = extractClientInfo(req);
+
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
       return res
         .status(401)
         .json({ status: "fail", message: "No token provided" });
     }
 
-    const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, JWT_SECRET_KEY);
-
-    // Blacklist
     blacklistedTokens.add(token);
 
-    await Admin.findByIdAndUpdate(decoded.id, {
+    const admin = await Admin.findByIdAndUpdate(decoded.id, {
       isLoggedIn: false,
       lastLogoutAt: new Date(),
     });
+
+    await addActivity(admin, "Logout", "Admin logged out", client);
 
     return res.status(200).json({
       status: "success",
       message: "Logout successful",
     });
   } catch (error) {
-    console.error("Logout Error:", error);
     return res.status(500).json({ status: "fail", message: error.message });
   }
 };
@@ -279,6 +302,7 @@ export const GetAdminUserList = async (req, res) => {
 
 export const updateAdmin = async (req, res) => {
   try {
+    const client = extractClientInfo(req);
     const { id, fullName, email, password, role } = req.body;
 
     const admin = await Admin.findById(id);
@@ -289,10 +313,18 @@ export const updateAdmin = async (req, res) => {
     admin.fullName = fullName || admin.fullName;
     admin.email = email || admin.email;
     admin.role = role || admin.role;
-    admin.password = password || admin.password;
-    admin.updatedAt = new Date();
+    if (password) admin.password = password;
 
+    admin.updatedAt = new Date();
     await admin.save();
+
+    await addActivity(
+      admin,
+      "Admin Profile Updated",
+      "Profile details updated successfully",
+      client,
+      "success"
+    );
 
     res.status(200).json({ message: "Admin updated successfully", admin });
   } catch (error) {
@@ -314,17 +346,22 @@ export const deleteAdmin = async (req, res) => {
 
 export const toggleLockAdmin = async (req, res) => {
   try {
+    const client = extractClientInfo(req);
     const { id } = req.body;
+
     const admin = await Admin.findById(id);
     if (!admin) return res.status(404).json({ message: "Admin not found" });
 
     admin.status = admin.status === "active" ? "locked" : "active";
-    if (admin.status === "active") {
-      admin.failedLoginAttempts = 0;
-      admin.lockUntil = undefined;
-      admin.updatedAt = new Date();
-    }
     await admin.save();
+
+    await addActivity(
+      admin,
+      "Admin Lock Toggle",
+      `Status changed to ${admin.status}`,
+      client,
+      "success"
+    );
 
     return res.status(200).json({ message: `Admin ${admin.status}` });
   } catch (err) {
@@ -504,6 +541,88 @@ export const getDashboardStats = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
+      status: "fail",
+      message: error.message,
+    });
+  }
+};
+
+// Portfolio Home API
+export const SavePortfolioHome = async (req, res) => {
+  try {
+    const { adminId, name, description, roles, profileImage } = req.body;
+
+    if (!name || !description) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Name and Description are required",
+      });
+    }
+
+    const admin = await Admin.findById(adminId);
+    const isNew = !admin.home || !admin.home.name;
+
+    if (!admin.home) admin.home = {};
+
+    admin.home.name = name;
+    admin.home.description = description;
+    admin.home.roles = roles || [];
+
+    if (profileImage) {
+      admin.home.profileImage = profileImage;
+    }
+
+    if (!admin.home.createdAt) {
+      admin.home.createdAt = new Date();
+    }
+    admin.home.updatedAt = new Date();
+
+    await admin.save();
+
+    return res.status(isNew ? 201 : 200).json({
+      status: "success",
+      action: isNew ? "Created" : "Updated",
+      message: `Home section ${isNew ? "created" : "updated"} successfully`,
+      data: admin.home,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      status: "fail",
+      message: err.message,
+    });
+  }
+};
+
+export const GetPortfolioHome = async (req, res) => {
+  try {
+    const adminId = req.body.id;
+    const admin = await Admin.findById(adminId);
+
+    if (!admin || !admin.home) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Home section not found",
+      });
+    }
+
+    const home = admin.home.toObject();
+
+    // Convert image to presigned URL
+    if (home.profileImage) {
+      const fileUrl = home.profileImage;
+      const presignedUrl = await getPresignedUrl(fileUrl, 3600);
+      home.profileImage = presignedUrl;
+    } else {
+      home.profileImage = null;
+    }
+
+    return res.status(200).json({
+      status: "success",
+      message: "Home data fetched successfully",
+      data: { home: home },
+    });
+  } catch (error) {
+    return res.status(500).json({
       status: "fail",
       message: error.message,
     });
@@ -1679,40 +1798,6 @@ export const SaveContactMessage = async (req, res) => {
   }
 };
 
-// export const SubmitContactMessages = async (req, res) => {
-//   try {
-//     const slug = req.params.slug;
-
-//     const { name, email, subject, message } = req.body;
-
-//     const admin = await Admin.findOne({ slug });
-//     if (!admin) {
-//       return res
-//         .status(404)
-//         .json({ status: "error", message: "User not found" });
-//     }
-
-//     const newMessage = {
-//       name: name,
-//       email: email,
-//       subject: subject,
-//       message: message,
-//       createdAt: new Date(),
-//     };
-
-//     admin.messages.push(newMessage);
-//     await admin.save();
-
-//     return res.json({
-//       status: "success",
-//       message: "Message sent successfully",
-//       data: { newMessage },
-//     });
-//   } catch (error) {
-//     return res.status(500).json({ status: "error", message: error.message });
-//   }
-// };
-
 export const GetAllContactMessages = async (req, res) => {
   try {
     const { id } = req.body;
@@ -1767,6 +1852,40 @@ export const DeleteContactMessage = async (req, res) => {
 };
 
 // Public View Using Slug Api
+export const GetPublicPortfolioHomeBySlug = async (req, res) => {
+  try {
+    const slug = req.params.slug;
+
+    const admin = await Admin.findOne({ slug });
+
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found for this slug",
+      });
+    }
+
+    const home = admin.home.toObject();
+
+    // Convert image to presigned URL
+    if (home.profileImage) {
+      const fileUrl = home.profileImage;
+      const presignedUrl = await getPresignedUrl(fileUrl, 3600);
+      home.profileImage = presignedUrl;
+    } else {
+      home.profileImage = null;
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Home data fetched successfully",
+      data: { home: home },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
 export const GetPublicPortfolioAboutBySlug = async (req, res) => {
   try {
     const slug = req.params.slug;
@@ -1780,10 +1899,34 @@ export const GetPublicPortfolioAboutBySlug = async (req, res) => {
       });
     }
 
+    const about = admin.about.toObject(); // convert mongoose document to plain object
+
+    // ----------------------------------------------------
+    // ✅ PROFILE IMAGE (Generate presigned URL)
+    // ----------------------------------------------------
+    if (about.profileImage) {
+      const fileUrl = about.profileImage; // stored fileUrl
+      const presignedUrl = await getPresignedUrl(fileUrl, 3600);
+      about.profileImage = presignedUrl;
+    } else {
+      about.profileImage = null;
+    }
+
+    // ----------------------------------------------------
+    // ✅ RESUME FILE (Generate presigned URL)
+    // ----------------------------------------------------
+    if (about.resumeFile) {
+      const resumeUrl = about.resumeFile;
+      const resumePresignedUrl = await getPresignedUrl(resumeUrl, 3600);
+      about.resumeFile = resumePresignedUrl;
+    } else {
+      about.resumeFile = null;
+    }
+
     res.status(200).json({
       status: "success",
       message: "About & Skills data fetched successfully",
-      data: { about: admin.about },
+      data: { about: about },
     });
   } catch (err) {
     res.status(500).json({ status: "fail", message: err.message });
@@ -1913,7 +2056,20 @@ export const GetPublicPortfolioProjectsBySlug = async (req, res) => {
       });
     }
 
-    const sortedProjects = admin.projects || [];
+    const projects = admin.projects.map((project) => project.toObject());
+
+    // Generate Pre-Signed URLs for each project's image
+    const sortedProjects = await Promise.all(
+      projects.map(async (proj) => {
+        if (proj.image) {
+          const presignedUrl = await getPresignedUrl(proj.image, 3600);
+          proj.image = presignedUrl;
+        } else {
+          proj.image = null;
+        }
+        return proj;
+      })
+    );
 
     res.status(200).json({
       status: "success",

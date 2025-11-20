@@ -24,6 +24,7 @@ import {
   GetPortfolioContactInfo,
   GetPortfolioEducations,
   GetPortfolioExperiences,
+  GetPortfolioHome,
   GetPortfolioProjects,
   GetPortfolioServices,
   GetPortfolioSkills,
@@ -31,6 +32,7 @@ import {
   GetPublicPortfolioContactInfoBySlug,
   GetPublicPortfolioEducationsBySlug,
   GetPublicPortfolioExperiencesBySlug,
+  GetPublicPortfolioHomeBySlug,
   GetPublicPortfolioProjectsBySlug,
   GetPublicPortfolioServicesBySlug,
   GetPublicPortfolioSkillsBySlug,
@@ -42,6 +44,7 @@ import {
   saveDashboardCards,
   saveDashboardStats,
   SavePortfolioAbout,
+  SavePortfolioHome,
   toggleLockAdmin,
   updateAdmin,
   UpdateEducation,
@@ -437,7 +440,6 @@ router.post("/get-admin-dashboard-cards", getDashboardCards);
  *         description: Server error
  */
 router.post("/save-admin-dashboard-stats", saveDashboardStats);
-
 /**
  * @swagger
  * /api/portfolio/get-stats:
@@ -466,6 +468,68 @@ router.post("/save-admin-dashboard-stats", saveDashboardStats);
  *         description: Server error
  */
 router.post("/get-admin-dashboard-stats", getDashboardStats);
+/**
+ * @swagger
+ * /api/portfolio/save-home-section:
+ *   post:
+ *     summary: Create or update Home section for Admin or Super Admin
+ *     tags:
+ *       - Portfolio (Home)
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adminId:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               roles:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               profileImage:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Home section saved successfully
+ *       400:
+ *         description: Missing required fields
+ *       500:
+ *         description: Server error
+ */
+router.post("/save-portfolio-home-section", SavePortfolioHome);
+/**
+ * @swagger
+ * /api/portfolio/get-portfolio-home:
+ *   post:
+ *     summary: Get Home section details
+ *     tags:
+ *       - Portfolio (Home)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Home data fetched successfully
+ *       404:
+ *         description: Home section not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/get-portfolio-home", GetPortfolioHome);
 /**
  * @swagger
  * /api/portfolio/save-about:
@@ -516,7 +580,7 @@ router.post("/save-portfolio-about-section", SavePortfolioAbout);
 
 /**
  * @swagger
- * /api/portfolio/public/about/{adminId}:
+ * /api/portfolio/public/about:
  *   get:
  *     summary: Get About data for public portfolio
  *     tags:
@@ -1444,6 +1508,33 @@ router.post("/get-portfolio-messages", GetAllContactMessages);
  *         description: Server error
  */
 router.post("/delete-portfolio-message", DeleteContactMessage);
+/**
+ * @swagger
+ * /api/portfolio/get-public-portfolio-home-by-slug/{slug}:
+ *   get:
+ *     summary: Get public portfolio Home section using slug
+ *     tags:
+ *       - Public Portfolio
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: avinash
+ *         description: Portfolio slug
+ *     responses:
+ *       200:
+ *         description: Home data fetched successfully
+ *       404:
+ *         description: Admin not found
+ *       500:
+ *         description: Server error
+ */
+router.get(
+  "/get-public-portfolio-home-by-slug/:slug",
+  GetPublicPortfolioHomeBySlug
+);
 /**
  * @swagger
  * /api/portfolio/get-public-portfolio-about-by-slug/{slug}:

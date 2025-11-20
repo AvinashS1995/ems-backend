@@ -1,6 +1,17 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 
+const HomeSchema = new mongoose.Schema({
+  name: { type: String, default: "" },
+  description: { type: String, default: "" },
+  roles: { type: [String], default: [] },
+  profileImage: { type: String, default: "" },
+  createdAt: { type: Date },
+  updatedAt: { type: Date },
+});
+
+const Home = mongoose.model("Portfolio-Home", HomeSchema);
+
 const StatsSchema = new mongoose.Schema({
   experience: { type: Number, default: 0 },
   clients: { type: Number, default: 0 },
@@ -172,11 +183,6 @@ const Location = mongoose.model("Admin-Location", locationSchema);
 
 const loginHistorySchema = new mongoose.Schema(
   {
-    adminId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Admin",
-      required: true,
-    },
     ip: String,
     userAgent: String,
     device: String,
@@ -193,11 +199,6 @@ const LoginHistory = mongoose.model("Admin-Login-History", loginHistorySchema);
 
 const activitySchema = new mongoose.Schema(
   {
-    adminId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Admin",
-      required: true,
-    },
     action: { type: String, required: true },
     description: String,
     ip: String,
@@ -228,6 +229,7 @@ const adminSchema = new mongoose.Schema({
   suspiciousIps: { type: [String], default: [] },
   loginHistory: [loginHistorySchema],
   activities: [activitySchema],
+  home: HomeSchema,
   about: AboutSchema,
   contactInfo: ContactInfoSchema,
   services: [ServiceSchema],
