@@ -7,7 +7,10 @@ import { UAParser } from "ua-parser-js";
 // 1. Extract Client Info
 // ===================================================================
 export const extractClientInfo = (req) => {
+  const publicIp = req.body?.clientIp; // 👈 IP from Angular
+
   const ip =
+    publicIp ||
     req.headers["x-forwarded-for"]?.split(",")[0] ||
     req.ip ||
     req.connection?.remoteAddress ||
@@ -95,17 +98,29 @@ export const saveLocation = async (admin, locationInfo) => {
 // ===================================================================
 export const fetchLocation = async (ip) => {
   try {
-    const response = await fetch(`https://ipapi.co/${ip}/json/`);
+    const response = await fetch(`https://ipwho.is/${ip}`);
     const data = await response.json();
+
+    if (!data.success) {
+      return {
+        ip,
+        country: "Unknown",
+        region: "Unknown",
+        city: "Unknown",
+        lat: null,
+        lng: null,
+        timezone: "Unknown",
+      };
+    }
 
     return {
       ip,
-      country: data.country_name || "Unknown",
+      country: data.country || "Unknown",
       region: data.region || "Unknown",
       city: data.city || "Unknown",
       lat: data.latitude || null,
       lng: data.longitude || null,
-      timezone: data.timezone || "Unknown",
+      timezone: data.timezone?.id || "Unknown",
     };
   } catch (err) {
     console.error("Location Fetch Error:", err);

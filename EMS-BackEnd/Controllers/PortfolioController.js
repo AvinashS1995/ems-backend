@@ -226,6 +226,8 @@ export const LogOut = async (req, res) => {
 
     await addActivity(admin, "Logout", "Admin logged out", client);
 
+    await admin.save();
+
     return res.status(200).json({
       status: "success",
       message: "Logout successful",
@@ -316,7 +318,6 @@ export const updateAdmin = async (req, res) => {
     if (password) admin.password = password;
 
     admin.updatedAt = new Date();
-    await admin.save();
 
     await addActivity(
       admin,
@@ -325,6 +326,8 @@ export const updateAdmin = async (req, res) => {
       client,
       "success"
     );
+
+    await admin.save();
 
     res.status(200).json({ message: "Admin updated successfully", admin });
   } catch (error) {
@@ -353,7 +356,6 @@ export const toggleLockAdmin = async (req, res) => {
     if (!admin) return res.status(404).json({ message: "Admin not found" });
 
     admin.status = admin.status === "active" ? "locked" : "active";
-    await admin.save();
 
     await addActivity(
       admin,
@@ -362,6 +364,8 @@ export const toggleLockAdmin = async (req, res) => {
       client,
       "success"
     );
+
+    await admin.save();
 
     return res.status(200).json({ message: `Admin ${admin.status}` });
   } catch (err) {
