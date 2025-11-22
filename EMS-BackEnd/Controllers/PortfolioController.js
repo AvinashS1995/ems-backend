@@ -1,5 +1,6 @@
 import {
   Admin,
+  AiUsage,
   DashboardCards,
   DashboardStats,
 } from "../Models/portfolioModel.js";
@@ -17,6 +18,7 @@ import {
   fetchLocation,
   saveLocation,
 } from "../common/loginSecurity.js";
+import { generateBioFromGemini } from "../common/aiService.js";
 
 dotenv.config({ path: "./.env" });
 
@@ -554,9 +556,9 @@ export const getDashboardStats = async (req, res) => {
 // Portfolio Home API
 export const SavePortfolioHome = async (req, res) => {
   try {
-    const { adminId, name, description, roles, profileImage } = req.body;
+    const { adminId, name, homeDescription, roles, profileImage } = req.body;
 
-    if (!name || !description) {
+    if (!name || !homeDescription) {
       return res.status(400).json({
         status: "fail",
         message: "Name and Description are required",
@@ -569,7 +571,7 @@ export const SavePortfolioHome = async (req, res) => {
     if (!admin.home) admin.home = {};
 
     admin.home.name = name;
-    admin.home.description = description;
+    admin.home.description = homeDescription;
     admin.home.roles = roles || [];
 
     if (profileImage) {
@@ -923,7 +925,7 @@ export const AddPortfolioExperiences = async (req, res) => {
       toYear,
       currentlyWorking,
       project,
-      description,
+      experienceDescription,
     } = req.body;
 
     if (
@@ -932,7 +934,7 @@ export const AddPortfolioExperiences = async (req, res) => {
       !role ||
       !fromYear ||
       !project ||
-      !description
+      !experienceDescription
     ) {
       return res
         .status(400)
@@ -954,7 +956,7 @@ export const AddPortfolioExperiences = async (req, res) => {
       toYear,
       currentlyWorking,
       project,
-      description,
+      description: experienceDescription,
       createdAt: new Date(),
     };
 
@@ -1006,7 +1008,7 @@ export const UpdatePortfolioExperiences = async (req, res) => {
       toYear,
       currentlyWorking,
       project,
-      description,
+      experienceDescription,
     } = req.body;
 
     if (
@@ -1016,7 +1018,7 @@ export const UpdatePortfolioExperiences = async (req, res) => {
       !role ||
       !fromYear ||
       !project ||
-      !description
+      !experienceDescription
     ) {
       return res
         .status(400)
@@ -1048,7 +1050,7 @@ export const UpdatePortfolioExperiences = async (req, res) => {
       toYear,
       currentlyWorking,
       project,
-      description,
+      description: experienceDescription,
       updatedAt: new Date(),
     };
 
@@ -2104,6 +2106,120 @@ export const GetPublicPortfolioContactInfoBySlug = async (req, res) => {
       data: { contactInfo: admin.contactInfo || {} },
     });
   } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const GenerateAI = async (req, res) => {
+  try {
+    const {
+      field,
+      title,
+      experience,
+      category,
+      role,
+      company,
+      project,
+      name,
+      roles,
+      prompt,
+    } = req.body;
+
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+
+    let usage = await AiUsage.findOne({ month, year });
+    if (!usage)
+      usage = await AiUsage.create({ month, year, requestsThisMonth: 0 });
+
+    if (usage.requestsThisMonth >= 25) {
+      return res.status(403).json({
+        status: "fail",
+        message: "AI request limit reached for this month (25 max)",
+        remaining: 0,
+      });
+    }
+
+    let finalPrompt = "";
+
+    switch (field) {
+      case "bio":
+        finalPrompt = `
+Write a professional portfolio bio in first person, only 2–3 lines.
+Focus on who I am, my role, skills expertise and experience.
+Avoid any headings, bullet points, or extra formatting.
+Title: ${title || ""}
+Experience: ${experience || ""}
+Extra: ${prompt || ""}
+`;
+        break;
+
+      case "bio2":
+        finalPrompt = `
+Write a short personal bio in first person, only 2–3 lines.
+Focus on passion, motivation, work style and future goals.
+Avoid any headings, bullet points, or formatting.
+Extra: ${prompt || ""}
+`;
+        break;
+
+      case "homeDescription":
+        finalPrompt = `
+Write a strong personal intro for my portfolio home section, 2–3 lines only.
+Explain what I do and what makes me valuable, in first person.
+No headings or bullet points.
+Name: ${name || ""}
+Roles: ${roles || ""}
+Extra: ${prompt || ""}
+`;
+        break;
+
+      case "experienceDescription":
+        finalPrompt = `
+Write a short experience description in first person, 2–3 lines only.
+Company: ${company || ""}
+Role: ${role || ""}
+Project: ${project || ""}
+Focus on responsibilities and measurable impact.
+No headings or bullet points.
+`;
+        break;
+
+      case "description": // project description
+        finalPrompt = `
+Write a short project description in first person, max 2–3 lines.
+Explain my contribution and the value delivered.
+No headings or bullet points.
+Project: ${title || ""}
+Category: ${category || ""}
+Role: ${role || ""}
+Extra: ${prompt || ""}
+`;
+        break;
+
+      default:
+        finalPrompt = `
+Write a short professional sentence in first person, 2–3 lines only.
+Avoid headings or bullet points.
+Info: ${prompt || ""}
+`;
+    }
+
+    const aiText = await generateBioFromGemini(finalPrompt);
+
+    usage.requestsThisMonth += 1;
+    await usage.save();
+    const remaining = 25 - usage.requestsThisMonth;
+
+    res.status(201).json({
+      status: "success",
+      message: `AI generated successfully. Remaining requests: ${remaining}`,
+      data: { aiText },
+      remaining,
+    });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ status: "fail", message: err.message });
   }
 };

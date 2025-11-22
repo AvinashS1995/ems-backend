@@ -375,6 +375,19 @@ const dashboardStatSchema = new mongoose.Schema(
 
 const DashboardStats = mongoose.model("Dashboard-Stats", dashboardStatSchema);
 
+const AiUsageSchema = new mongoose.Schema(
+  {
+    month: { type: Number, required: true },
+    year: { type: Number, required: true },
+    requestsThisMonth: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
+
+AiUsageSchema.index({ month: 1, year: 1 }, { unique: true });
+
+const AiUsage = mongoose.model("AiUsage", AiUsageSchema);
+
 export {
   Admin,
   DashboardCards,
@@ -386,4 +399,5 @@ export {
   Projects,
   Contacts,
   Messages,
+  AiUsage,
 };

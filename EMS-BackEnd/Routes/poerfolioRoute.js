@@ -15,6 +15,7 @@ import {
   DeletePortfolioProjects,
   DeletePortfolioServices,
   DeletePortfolioSkills,
+  GenerateAI,
   getAdminActivity,
   GetAdminUserList,
   GetAllContactMessages,
@@ -1706,4 +1707,49 @@ router.get(
   "/get-public-portfolio-contact-info-by-slug/:slug",
   GetPublicPortfolioContactInfoBySlug
 );
+/**
+ * @swagger
+ * /api/portfolio/ai-generate:
+ *   post:
+ *     summary: Generate AI text for portfolio (bio, home, experience, projects)
+ *     tags: [Portfolio (AI)]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               field:
+ *                 type: string
+ *               title:
+ *                 type: string
+ *               experience:
+ *                 type: string
+ *               category:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *               company:
+ *                 type: string
+ *               project:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               roles:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               prompt:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: AI generated successfully
+ *       403:
+ *         description: AI request limit reached for this month
+ *       500:
+ *         description: Internal Server error
+ */
+router.post("/ai-generate", GenerateAI);
+
 export default router;
