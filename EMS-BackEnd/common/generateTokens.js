@@ -20,6 +20,7 @@ export const generateTokens = (admin) => {
     role: admin.role,
     fullName: admin.fullName,
     email: admin.email,
+    profileImage: admin.profileImage || "",
   };
 
   const accessToken = jwt.sign(payload, JWT_SECRET_KEY, {

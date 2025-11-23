@@ -216,7 +216,9 @@ const adminSchema = new mongoose.Schema({
   slug: { type: String, unique: true, trim: true },
   fullName: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true },
+  mobile: { type: String },
   password: { type: String, required: true, select: false },
+  profileImage: { type: String, trim: true },
   role: {
     type: String,
   },

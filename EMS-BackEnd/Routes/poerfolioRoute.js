@@ -6,6 +6,7 @@ import {
   AddPortfolioProjects,
   AddPortfolioServices,
   AddPortfolioSkills,
+  checkUnique,
   createAdmin,
   deleteAdmin,
   DeleteContactMessage,
@@ -17,6 +18,7 @@ import {
   DeletePortfolioSkills,
   GenerateAI,
   getAdminActivity,
+  getAdminByID,
   GetAdminUserList,
   GetAllContactMessages,
   getDashboardCards,
@@ -215,6 +217,64 @@ router.post("/reset-password", resetPassword);
  *         description: Server error
  */
 router.post("/get-admin-user-list", GetAdminUserList);
+/**
+ * @swagger
+ * /api/portfolio/portfolio-check-unique-username-slug:
+ *   post:
+ *     summary: Check if a username or slug is unique
+ *     tags: [Portfolio]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - field
+ *               - value
+ *             properties:
+ *               field:
+ *                 type: string
+ *               value:
+ *                 type: string
+ *               id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Returns whether the value exists
+ *       400:
+ *         description: Invalid request (missing field/value)
+ *       500:
+ *         description: Server error
+ */
+
+router.post("/portfolio-check-unique-username-slug", checkUnique);
+/**
+ * @swagger
+ * /api/portfolio/get-admin-by-id:
+ *   post:
+ *     summary: Get a single admin by ID
+ *     tags: [Portfolio]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Admin record fetched successfully
+ *       400:
+ *         description: Bad request (missing ID)
+ *       404:
+ *         description: Admin not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/portfolio-get-admin-by-id", getAdminByID);
 
 /**
  * @swagger
@@ -236,9 +296,17 @@ router.post("/get-admin-user-list", GetAdminUserList);
  *                 type: string
  *               email:
  *                 type: string
- *               role:
+ *               password:
  *                 type: string
- *               status:
+ *               mobile:
+ *                 type: string
+ *               username:
+ *                 type: string
+ *               profileImage:
+ *                 type: string
+ *               slug:
+ *                 type: string
+ *               role:
  *                 type: string
  *     responses:
  *       200:

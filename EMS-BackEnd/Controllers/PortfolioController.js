@@ -9,7 +9,6 @@ import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { generateTokens } from "../common/generateTokens.js";
 import mongoose from "mongoose";
-import transporter from "../mail/transporter.js";
 import { getPresignedUrl } from "../storage/s3.config.js";
 import {
   addActivity,
@@ -150,6 +149,10 @@ export const Login = async (req, res) => {
     // SAVE ACTIVITY
     await addActivity(admin, "Login Success", "Logged in successfully", client);
 
+    if (admin.profileImage) {
+      admin.profileImage = await getPresignedUrl(admin.profileImage, 3600);
+    }
+
     const { accessToken, refreshToken } = generateTokens(admin);
     await admin.save();
 
@@ -162,6 +165,7 @@ export const Login = async (req, res) => {
         fullName: admin.fullName,
         email: admin.email,
         role: admin.role,
+        profileImage: admin.profileImage,
       },
     });
   } catch (error) {
@@ -304,10 +308,82 @@ export const GetAdminUserList = async (req, res) => {
   }
 };
 
+export const checkUnique = async (req, res) => {
+  try {
+    const { field, value, id } = req.body; // id = current user ID
+
+    if (!field || !value) {
+      return res.status(400).json({ message: "Invalid request" });
+    }
+
+    // Check if any other document has the same value for the field
+    const query = { [field]: value };
+    if (id) {
+      query._id = { $ne: id }; // exclude current user
+    }
+
+    const exists = await Admin.findOne(query);
+    res.json({ exists: !!exists });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const getAdminByID = async (req, res) => {
+  try {
+    const { id } = req.body;
+
+    if (!id) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Admin ID is required",
+      });
+    }
+
+    const admin = await Admin.findById(id).select(
+      "fullName email role mobile profileImage username slug password createAt status lastLoginIp isLoggedIn"
+    );
+
+    if (admin.profileImage) {
+      admin.profileImage = await getPresignedUrl(admin.profileImage, 3600);
+    }
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found",
+      });
+    }
+
+    return res.status(200).json({
+      status: "success",
+      message: "Admin record fetched successfully!",
+      data: {
+        admin,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: "fail",
+      message: "Server error",
+    });
+  }
+};
+
 export const updateAdmin = async (req, res) => {
   try {
     const client = extractClientInfo(req);
-    const { id, fullName, email, password, role } = req.body;
+    const {
+      id,
+      fullName,
+      email,
+      password,
+      mobile,
+      username,
+      profileImage,
+      slug,
+      role,
+    } = req.body;
 
     const admin = await Admin.findById(id);
     if (!admin) {
@@ -317,7 +393,14 @@ export const updateAdmin = async (req, res) => {
     admin.fullName = fullName || admin.fullName;
     admin.email = email || admin.email;
     admin.role = role || admin.role;
-    if (password) admin.password = password;
+    admin.mobile = mobile || admin.mobile;
+    admin.username = username || admin.username;
+    admin.slug = slug || admin.slug;
+    admin.profileImage = profileImage || admin.profileImage;
+
+    if (password) {
+      admin.password = password;
+    }
 
     admin.updatedAt = new Date();
 
