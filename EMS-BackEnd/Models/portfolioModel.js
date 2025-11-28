@@ -214,6 +214,7 @@ const Activity = mongoose.model("Admin-Activity-Log", activitySchema);
 const adminSchema = new mongoose.Schema({
   username: { type: String, unique: true, trim: true },
   slug: { type: String, unique: true, trim: true },
+  portfolioWebsiteName: { type: String, unique: true, trim: true },
   fullName: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true },
   mobile: { type: String },

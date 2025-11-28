@@ -341,7 +341,7 @@ export const getAdminByID = async (req, res) => {
     }
 
     const admin = await Admin.findById(id).select(
-      "fullName email role mobile profileImage username slug password createAt status lastLoginIp isLoggedIn"
+      "fullName email role mobile profileImage portfolioWebsiteName username slug password createAt status lastLoginIp isLoggedIn"
     );
 
     if (admin.profileImage) {
@@ -383,6 +383,7 @@ export const updateAdmin = async (req, res) => {
       profileImage,
       slug,
       role,
+      portfolioWebsiteName,
     } = req.body;
 
     const admin = await Admin.findById(id);
@@ -397,6 +398,8 @@ export const updateAdmin = async (req, res) => {
     admin.username = username || admin.username;
     admin.slug = slug || admin.slug;
     admin.profileImage = profileImage || admin.profileImage;
+    admin.portfolioWebsiteName =
+      portfolioWebsiteName || admin.portfolioWebsiteName;
 
     if (password) {
       admin.password = password;
@@ -2187,6 +2190,29 @@ export const GetPublicPortfolioContactInfoBySlug = async (req, res) => {
       status: "success",
       message: "Contact Info data fetched successfully",
       data: { contactInfo: admin.contactInfo || {} },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const GetPublicPortfolioWebsiteInfoBySlug = async (req, res) => {
+  try {
+    const slug = req.params.slug;
+
+    const admin = await Admin.findOne({ slug });
+
+    if (!admin) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Admin not found for this slug",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Contact Info data fetched successfully",
+      data: { portfolioWebsite: admin.portfolioWebsiteName },
     });
   } catch (err) {
     res.status(500).json({ status: "fail", message: err.message });

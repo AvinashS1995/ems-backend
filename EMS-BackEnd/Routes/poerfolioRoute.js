@@ -39,6 +39,7 @@ import {
   GetPublicPortfolioProjectsBySlug,
   GetPublicPortfolioServicesBySlug,
   GetPublicPortfolioSkillsBySlug,
+  GetPublicPortfolioWebsiteInfoBySlug,
   Login,
   LogOut,
   refreshToken,
@@ -1774,6 +1775,29 @@ router.get(
 router.get(
   "/get-public-portfolio-contact-info-by-slug/:slug",
   GetPublicPortfolioContactInfoBySlug
+);
+/**
+ * @swagger
+ * /api/portfolio/get-public-portfolio-website-by-slug/{slug}:
+ *   get:
+ *     summary: Get public portfolio Projects section using slug
+ *     tags:
+ *       - Public Portfolio
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Portfolio Website Name fetched successfully
+ *       404:
+ *         description: Admin not found
+ */
+router.get(
+  "/get-public-portfolio-website-by-slug/:slug",
+  GetPublicPortfolioWebsiteInfoBySlug
 );
 /**
  * @swagger
