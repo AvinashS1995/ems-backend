@@ -15,6 +15,7 @@ import projectRoutes from "./Routes/projectTaskRoute.js";
 import weatherRoutes from "./Routes/weatherRoute.js";
 import invoiceRoutes from "./Routes/invoiceRoute.js";
 import portfolioRoutes from "./Routes/poerfolioRoute.js";
+import workTrackingsRoutes from "./Routes/workTrackingsRoute.js";
 import { ConnectToDatabase } from "./db/db.js";
 import setupSwagger from "./swagger/swagger.js";
 import startCron from "./crons/cronRun.js";
@@ -33,7 +34,7 @@ app.use(
     ],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
-  })
+  }),
 );
 app.use(express.json());
 app.use("/api/auth", authRouter);
@@ -50,6 +51,7 @@ app.use("/api/project", projectRoutes);
 app.use("/api/weather", weatherRoutes);
 app.use("/api/invoice", invoiceRoutes);
 app.use("/api/portfolio", portfolioRoutes);
+app.use("/api/work-trackings", workTrackingsRoutes);
 
 setupSwagger(app);
 
