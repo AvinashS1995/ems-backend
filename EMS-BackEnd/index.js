@@ -31,6 +31,7 @@ app.use(
       "https://ems-project-kappa.vercel.app",
       "https://weather-forecast-dashboard-theta.vercel.app",
       "https://personal-portfolio-eight-rho-54.vercel.app",
+      "https://devtrack-pro-theta.vercel.app",
     ],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
