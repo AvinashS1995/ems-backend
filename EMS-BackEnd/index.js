@@ -32,6 +32,7 @@ app.use(
       "https://weather-forecast-dashboard-theta.vercel.app",
       "https://personal-portfolio-eight-rho-54.vercel.app",
       "https://devtrack-pro-theta.vercel.app",
+      "https://nexa-profile-sage.vercel.app",
     ],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
