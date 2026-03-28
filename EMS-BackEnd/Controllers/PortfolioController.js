@@ -18,6 +18,7 @@ import {
   saveLocation,
 } from "../common/loginSecurity.js";
 import { generateBioFromGemini } from "../common/aiService.js";
+import { sendUserMessageTemplate } from "../mail/sendUserMessageTemplate.js";
 
 dotenv.config({ path: "./.env" });
 
@@ -44,7 +45,7 @@ export const createAdmin = async (req, res) => {
         "Admin Create Failed",
         `Email ${email} already exists`,
         client,
-        "failed"
+        "failed",
       );
 
       return res.status(409).json({
@@ -65,7 +66,7 @@ export const createAdmin = async (req, res) => {
       admin,
       "Admin Created",
       `New admin created with role: ${role}`,
-      client
+      client,
     );
 
     return res.status(201).json({
@@ -98,7 +99,7 @@ export const Login = async (req, res) => {
         "Login Failed",
         "Invalid email",
         client,
-        "failed"
+        "failed",
       );
       return res
         .status(401)
@@ -121,7 +122,7 @@ export const Login = async (req, res) => {
         "Login Failed",
         "Incorrect password",
         client,
-        "failed"
+        "failed",
       );
 
       return res.status(401).json({
@@ -198,7 +199,7 @@ export const refreshToken = async (req, res) => {
       const newAccessToken = jwt.sign(
         { id: admin._id, role: admin.role },
         JWT_SECRET_KEY,
-        { expiresIn: ACCESS_TOKEN_EXPIRES_IN }
+        { expiresIn: ACCESS_TOKEN_EXPIRES_IN },
       );
 
       return res.status(200).json({
@@ -291,7 +292,7 @@ export const GetAdminUserList = async (req, res) => {
     }
 
     const admins = await Admin.find().select(
-      "fullName email role status lastLoginIp isLoggedIn"
+      "fullName email role status lastLoginIp isLoggedIn",
     );
     return res.status(200).json({
       status: "success",
@@ -341,7 +342,7 @@ export const getAdminByID = async (req, res) => {
     }
 
     const admin = await Admin.findById(id).select(
-      "fullName email role mobile profileImage portfolioWebsiteName username slug password createAt status lastLoginIp isLoggedIn"
+      "fullName email role mobile profileImage portfolioWebsiteName username slug password createAt status lastLoginIp isLoggedIn",
     );
 
     if (admin.profileImage) {
@@ -412,7 +413,7 @@ export const updateAdmin = async (req, res) => {
       "Admin Profile Updated",
       "Profile details updated successfully",
       client,
-      "success"
+      "success",
     );
 
     await admin.save();
@@ -450,7 +451,7 @@ export const toggleLockAdmin = async (req, res) => {
       "Admin Lock Toggle",
       `Status changed to ${admin.status}`,
       client,
-      "success"
+      "success",
     );
 
     await admin.save();
@@ -927,7 +928,7 @@ export const UpdateEducation = async (req, res) => {
     }
 
     const eduIndex = admin.education.findIndex(
-      (e) => e._id.toString() === eduId
+      (e) => e._id.toString() === eduId,
     );
     if (eduIndex === -1) {
       return res
@@ -978,7 +979,7 @@ export const DeleteEducation = async (req, res) => {
     }
 
     const eduIndex = admin.education.findIndex(
-      (e) => e._id.toString() === eduId
+      (e) => e._id.toString() === eduId,
     );
     if (eduIndex === -1) {
       return res
@@ -1119,7 +1120,7 @@ export const UpdatePortfolioExperiences = async (req, res) => {
     }
 
     const expIndex = admin.experience.findIndex(
-      (e) => e._id.toString() === expId
+      (e) => e._id.toString() === expId,
     );
     if (expIndex === -1) {
       return res
@@ -1172,7 +1173,7 @@ export const DeletePortfolioExperiences = async (req, res) => {
     }
 
     const expIndex = admin.experience.findIndex(
-      (e) => e._id.toString() === expId
+      (e) => e._id.toString() === expId,
     );
     if (expIndex === -1) {
       return res
@@ -1271,7 +1272,7 @@ export const UpdatePortfolioServices = async (req, res) => {
     }
 
     const servicesIndex = admin.services.findIndex(
-      (e) => e._id.toString() === serviceId
+      (e) => e._id.toString() === serviceId,
     );
     if (servicesIndex === -1) {
       return res
@@ -1321,7 +1322,7 @@ export const DeletePortfolioServices = async (req, res) => {
     }
 
     const servicesIndex = admin.services.findIndex(
-      (e) => e._id.toString() === serviceId
+      (e) => e._id.toString() === serviceId,
     );
     if (servicesIndex === -1) {
       return res
@@ -1420,7 +1421,7 @@ export const UpdatePortfolioSkills = async (req, res) => {
     }
 
     const skillsIndex = admin.skills.findIndex(
-      (e) => e._id.toString() === skillId
+      (e) => e._id.toString() === skillId,
     );
     if (skillsIndex === -1) {
       return res
@@ -1470,7 +1471,7 @@ export const DeletePortfolioSkills = async (req, res) => {
     }
 
     const skillsIndex = admin.skills.findIndex(
-      (e) => e._id.toString() === skillId
+      (e) => e._id.toString() === skillId,
     );
     if (skillsIndex === -1) {
       return res
@@ -1571,7 +1572,7 @@ export const GetPortfolioProjects = async (req, res) => {
           proj.image = null;
         }
         return proj;
-      })
+      }),
     );
 
     res.status(200).json({
@@ -1612,7 +1613,7 @@ export const UpdatePortfolioProjects = async (req, res) => {
     }
 
     const projectsIndex = admin.projects.findIndex(
-      (e) => e._id.toString() === projectId
+      (e) => e._id.toString() === projectId,
     );
     if (projectsIndex === -1) {
       return res
@@ -1667,7 +1668,7 @@ export const DeletePortfolioProjects = async (req, res) => {
     }
 
     const projectsIndex = admin.services.findIndex(
-      (e) => e._id.toString() === projectId
+      (e) => e._id.toString() === projectId,
     );
     if (projectsIndex === -1) {
       return res
@@ -1929,7 +1930,7 @@ export const DeleteContactMessage = async (req, res) => {
     }
 
     admin.messages = admin.messages.filter(
-      (msg) => msg._id.toString() !== messageId
+      (msg) => msg._id.toString() !== messageId,
     );
 
     await admin.save();
@@ -2160,7 +2161,7 @@ export const GetPublicPortfolioProjectsBySlug = async (req, res) => {
           proj.image = null;
         }
         return proj;
-      })
+      }),
     );
 
     res.status(200).json({
@@ -2330,5 +2331,38 @@ Info: ${prompt || ""}
   } catch (err) {
     console.error(err);
     res.status(500).json({ status: "fail", message: err.message });
+  }
+};
+
+export const sendMessage = async (req, res) => {
+  try {
+    const { name, email, subject, message } = req.body;
+
+    // Validation
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
+
+    // Send email
+    await sendUserMessageTemplate({
+      name,
+      email,
+      subject,
+      message,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Message sent successfully!",
+    });
+  } catch (error) {
+    console.error("Send Message Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+    });
   }
 };

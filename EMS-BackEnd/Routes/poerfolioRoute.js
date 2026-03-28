@@ -49,6 +49,7 @@ import {
   saveDashboardStats,
   SavePortfolioAbout,
   SavePortfolioHome,
+  sendMessage,
   toggleLockAdmin,
   updateAdmin,
   UpdateEducation,
@@ -1603,7 +1604,7 @@ router.post("/delete-portfolio-message", DeleteContactMessage);
  */
 router.get(
   "/get-public-portfolio-home-by-slug/:slug",
-  GetPublicPortfolioHomeBySlug
+  GetPublicPortfolioHomeBySlug,
 );
 /**
  * @swagger
@@ -1630,7 +1631,7 @@ router.get(
  */
 router.get(
   "/get-public-portfolio-about-by-slug/:slug",
-  GetPublicPortfolioAboutBySlug
+  GetPublicPortfolioAboutBySlug,
 );
 /**
  * @swagger
@@ -1654,7 +1655,7 @@ router.get(
  */
 router.get(
   "/get-public-portfolio-educations-by-slug/:slug",
-  GetPublicPortfolioEducationsBySlug
+  GetPublicPortfolioEducationsBySlug,
 );
 /**
  * @swagger
@@ -1678,7 +1679,7 @@ router.get(
  */
 router.get(
   "/get-public-portfolio-experiences-by-slug/:slug",
-  GetPublicPortfolioExperiencesBySlug
+  GetPublicPortfolioExperiencesBySlug,
 );
 /**
  * @swagger
@@ -1702,7 +1703,7 @@ router.get(
  */
 router.get(
   "/get-public-portfolio-skills-by-slug/:slug",
-  GetPublicPortfolioSkillsBySlug
+  GetPublicPortfolioSkillsBySlug,
 );
 /**
  * @swagger
@@ -1726,7 +1727,7 @@ router.get(
  */
 router.get(
   "/get-public-portfolio-services-by-slug/:slug",
-  GetPublicPortfolioServicesBySlug
+  GetPublicPortfolioServicesBySlug,
 );
 /**
  * @swagger
@@ -1750,7 +1751,7 @@ router.get(
  */
 router.get(
   "/get-public-portfolio-projects-by-slug/:slug",
-  GetPublicPortfolioProjectsBySlug
+  GetPublicPortfolioProjectsBySlug,
 );
 /**
  * @swagger
@@ -1774,7 +1775,7 @@ router.get(
  */
 router.get(
   "/get-public-portfolio-contact-info-by-slug/:slug",
-  GetPublicPortfolioContactInfoBySlug
+  GetPublicPortfolioContactInfoBySlug,
 );
 /**
  * @swagger
@@ -1797,7 +1798,7 @@ router.get(
  */
 router.get(
   "/get-public-portfolio-website-by-slug/:slug",
-  GetPublicPortfolioWebsiteInfoBySlug
+  GetPublicPortfolioWebsiteInfoBySlug,
 );
 /**
  * @swagger
@@ -1843,5 +1844,41 @@ router.get(
  *         description: Internal Server error
  */
 router.post("/ai-generate", GenerateAI);
+/**
+ * @swagger
+ * /api/portfolio/send-message:
+ *   post:
+ *     summary: Send Contact Message from Portfolio
+ *     tags:
+ *       - Portfolio
+ *     description: This API allows users to send a message via the portfolio contact form. The message will be delivered to the owner's email.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: John Doe
+ *               email:
+ *                 type: string
+ *                 example: john@gmail.com
+ *               subject:
+ *                 type: string
+ *                 example: Job Opportunity
+ *               message:
+ *                 type: string
+ *                 example: Hello, I would like to discuss a project with you.
+ *     responses:
+ *       200:
+ *         description: Message sent successfully!
+ *       400:
+ *         description: Bad request or missing required fields
+ *       500:
+ *         description: Something went wrong
+ */
+router.post("/send-message", sendMessage);
 
 export default router;
