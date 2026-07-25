@@ -7,14 +7,14 @@ dotenv.config({ path: "./.env" });
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587, // Use 465 for SSL or 587 for TLS
-  secure: true, // True for 465, false for 587
+  secure: false, // True for 465, false for 587
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  tls: {
-    rejectUnauthorized: false,
-  },
+  // tls: {
+  //   rejectUnauthorized: false,
+  // },
 });
 
 export default transporter;
