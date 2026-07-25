@@ -2361,7 +2361,7 @@ export const sendMessage = async (req, res) => {
   } catch (error) {
     console.error("Send Message Error:", error);
     return res.status(500).json({
-      status: "success",
+      status: "fail",
       message: error.message,
     });
   }
