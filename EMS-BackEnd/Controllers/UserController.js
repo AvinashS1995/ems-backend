@@ -208,13 +208,200 @@ const CreateUser = async (req, res) => {
   }
 };
 
+// const GetUserList = async (req, res) => {
+//   try {
+//     console.log("=================================");
+//     console.log("REQ.USER:", req.user);
+//     console.log("REQ.USER EMAIL:", req.email);
+//     console.log("REQ.USER ID:", req.user?._id);
+//     console.log("=================================");
+
+//     const { name, role, status, type } = req.body;
+
+//     // const query = entityValue ? { entityValue } : {};
+
+//     const query = {};
+
+//     // --------------------------------
+//     // 1. NEVER SHOW ADMIN
+//     // --------------------------------
+//     query.roleId = { $ne: 1 };
+
+//     // --------------------------------
+//     // 2. NEVER SHOW LOGGED-IN USER
+//     // --------------------------------
+//     if (req.user?.email) {
+//       query.email = { $ne: req.user.email };
+//     }
+
+//     if (role) {
+//       query.role = role;
+//     }
+
+//     if (status) {
+//       query.status = status;
+//     }
+
+//     if (type) {
+//       query.type = type;
+//     }
+
+//     if (name) {
+//       query.name = { $regex: "^" + name, $options: "i" };
+//     }
+
+//     const page = parseInt(req.body.page) || 1;
+//     const limit = parseInt(req.body.limit) || 10;
+//     const skip = (page - 1) * limit;
+
+//     const total = await User.countDocuments();
+//     // const data = await User.find().skip(skip).limit(limit);
+
+//     const users = await User.find(query).skip(skip).limit(limit);
+
+//     const userList = await Promise.all(
+//       users.map(async (user) => {
+//         if (user.profileImage) {
+//           const fileKey = user.profileImage; // stored fileKey
+//           const presignedUrl = await getPresignedUrl(fileKey, 3600);
+//           user.profileImage = presignedUrl;
+//         } else {
+//           user.profileImage = null;
+//         }
+//         return user;
+//       }),
+//     );
+
+//     res.status(200).json({
+//       status: "success",
+//       message: "Record(s) Fetched Successfully..!",
+//       data: {
+//         currentPage: page,
+//         totalPages: Math.ceil(total / limit),
+//         totalRecords: total,
+//         userList,
+//       },
+//     });
+//   } catch (err) {
+//     res.status(500).json({
+//       status: "fail",
+//       error: err.message,
+//     });
+//   }
+// };
+
 const GetUserList = async (req, res) => {
   try {
-    const { name, role, status, type } = req.body;
+    const { empNo, name, role, status, type } = req.body;
 
-    // const query = entityValue ? { entityValue } : {};
+    // ==========================================
+    // 1. Logged-in Employee Number
+    // ==========================================
 
-    const query = {};
+    const loggedInEmpNo = empNo;
+
+    if (!loggedInEmpNo) {
+      return res.status(401).json({
+        status: "fail",
+        message: "Logged-in employee number not found",
+      });
+    }
+
+    console.log("Logged-in Employee:", loggedInEmpNo);
+
+    // ==========================================
+    // Find ALL descendants recursively
+    // ==========================================
+
+    const hierarchy = await UserReporting.aggregate([
+      {
+        $match: {
+          employee: loggedInEmpNo,
+        },
+      },
+
+      {
+        $graphLookup: {
+          from: "userreportings",
+
+          startWith: "$employee",
+
+          connectFromField: "employee",
+
+          connectToField: "reportedByEmployee",
+
+          as: "allSubordinates",
+        },
+      },
+    ]);
+
+    // ==========================================
+    // Get employee numbers
+    // ==========================================
+
+    let employeeNos = [];
+
+    if (hierarchy.length > 0) {
+      employeeNos = hierarchy[0].allSubordinates
+        .filter((item) => item.employee !== loggedInEmpNo)
+        .sort((a, b) => {
+          // First hierarchy level
+          if (a.level !== b.level) {
+            return a.level - b.level;
+          }
+
+          // Within same level: first created first
+          return new Date(a.createdAt) - new Date(b.createdAt);
+        })
+        .map((item) => item.employee);
+    }
+
+    // Remove duplicate employee numbers
+    employeeNos = [...new Set(employeeNos)];
+
+    console.log("All Employees Under:", loggedInEmpNo, employeeNos);
+
+    // ==========================================
+    // 3. If no employees
+    // ==========================================
+
+    if (employeeNos.length === 0) {
+      return res.status(200).json({
+        status: "success",
+
+        message: "No employees found under logged-in user",
+
+        data: {
+          currentPage: 1,
+
+          totalPages: 0,
+
+          totalRecords: 0,
+
+          userList: [],
+        },
+      });
+    }
+
+    // ==========================================
+    // 4. Build User Query
+    // ==========================================
+
+    const query = {
+      // Only employees under logged-in user
+      empNo: {
+        $in: employeeNos,
+      },
+
+      // Never show Admin
+      roleId: {
+        $ne: 1,
+      },
+    };
+
+    // ==========================================
+    // 5. Other filters
+    // ==========================================
 
     if (role) {
       query.role = role;
@@ -229,44 +416,83 @@ const GetUserList = async (req, res) => {
     }
 
     if (name) {
-      query.name = { $regex: "^" + name, $options: "i" };
+      query.name = {
+        $regex: "^" + name,
+        $options: "i",
+      };
     }
 
+    console.log("Final User Query:", query);
+
+    // ==========================================
+    // 6. Pagination
+    // ==========================================
+
     const page = parseInt(req.body.page) || 1;
+
     const limit = parseInt(req.body.limit) || 10;
+
     const skip = (page - 1) * limit;
 
-    const total = await User.countDocuments();
-    // const data = await User.find().skip(skip).limit(limit);
+    // ==========================================
+    // 7. Total records
+    // ==========================================
 
-    const users = await User.find(query).skip(skip).limit(limit);
+    const total = await User.countDocuments(query);
+
+    // ==========================================
+    // 8. Get Users
+    // ==========================================
+
+    const users = await User.find(query)
+      .skip(skip)
+      .limit(limit)
+      .sort({
+        createAt: -1,
+      })
+      .lean();
+
+    // ==========================================
+    // 9. Profile Images
+    // ==========================================
 
     const userList = await Promise.all(
       users.map(async (user) => {
         if (user.profileImage) {
-          const fileKey = user.profileImage; // stored fileKey
-          const presignedUrl = await getPresignedUrl(fileKey, 3600);
-          user.profileImage = presignedUrl;
+          user.profileImage = await getPresignedUrl(user.profileImage, 3600);
         } else {
           user.profileImage = null;
         }
+
         return user;
-      })
+      }),
     );
 
-    res.status(200).json({
+    // ==========================================
+    // 10. Response
+    // ==========================================
+
+    return res.status(200).json({
       status: "success",
+
       message: "Record(s) Fetched Successfully..!",
+
       data: {
         currentPage: page,
+
         totalPages: Math.ceil(total / limit),
+
         totalRecords: total,
+
         userList,
       },
     });
   } catch (err) {
-    res.status(500).json({
+    console.error("GetUserList Error:", err);
+
+    return res.status(500).json({
       status: "fail",
+
       error: err.message,
     });
   }
@@ -340,7 +566,7 @@ const UpdateEmployeeList = async (req, res) => {
       await UserReporting.findOneAndUpdate(
         { employee: empNo },
         { reportedByEmployee: newReportedByEmpID },
-        { upsert: true }
+        { upsert: true },
       );
     }
 
@@ -361,7 +587,7 @@ const UpdateEmployeeList = async (req, res) => {
             yearly: breakup.yearly,
           },
         },
-        { new: true, upsert: true } // return updated doc, create if not exists
+        { new: true, upsert: true }, // return updated doc, create if not exists
       );
 
       const ctcBreakup = await EmployeeAnnuallySalaryBreakup.findOne({
@@ -420,7 +646,7 @@ const UpdateEmployeeList = async (req, res) => {
       await UserReporting.findOneAndUpdate(
         { employee: empNo },
         { reportedByEmployee: newReportedByEmpID },
-        { upsert: true }
+        { upsert: true },
       );
     }
 
@@ -533,7 +759,7 @@ const GetTypeList = async (req, res) => {
     }
 
     const types = await Type.find(query).select(
-      "_id entityValue typeLabel typeValue departmentType description"
+      "_id entityValue typeLabel typeValue departmentType description",
     );
 
     res.status(200).json({
@@ -770,7 +996,7 @@ const getManagerWiseTeamLeaderWithEmployees = async (req, res) => {
             designation: e.designation,
           })),
         };
-      })
+      }),
     );
 
     res.status(200).json({
