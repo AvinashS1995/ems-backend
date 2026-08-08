@@ -51,8 +51,8 @@ export async function fetchAndSaveYearHolidays() {
 
 export default function startGoogleCalendarHolidayCron() {
   cron.schedule(
-    "0 0 1 1 *",
-    // "20 1 * * *",
+    // "0 0 1 1 *",
+    "43 1 * * *",
     async () => {
       console.log("[CRON] January 1st - Starting new year holiday sync...");
 
