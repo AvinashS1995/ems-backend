@@ -54,25 +54,42 @@ const sendPayslipEmail = async ({
   salary,
   leave,
 }) => {
-  const htmlContent = payslipEmailTemplate({
-    monthYear,
-    employeeName: `${employee.firstName} ${employee.lastName}`,
-    salary,
-    leave,
-  });
+  try {
+    const htmlContent = payslipEmailTemplate({
+      monthYear,
+      employeeName: `${employee.firstName} ${employee.lastName}`,
+      salary,
+      leave,
+    });
 
-  await transporter.sendMail({
-    from: `"HR Department" <${process.env.EMAIL_USER}>`,
-    to,
-    subject: `📄 Payslip - ${monthYear}`,
-    html: htmlContent,
-    attachments: [
-      {
-        filename: `Payslip-${monthYear}.pdf`,
-        content: pdfBuffer,
-      },
-    ],
-  });
+    const { data, error } = await resend.emails.send({
+      from: `HR Department <${process.env.RESEND_EMAIL_FROM}>`,
+      to: [to],
+      subject: `📄 Payslip - ${monthYear}`,
+      html: htmlContent,
+
+      attachments: [
+        {
+          filename: `Payslip-${monthYear}.pdf`,
+          content: pdfBuffer,
+        },
+      ],
+    });
+
+    if (error) {
+      console.error("❌ Resend Payslip Email Error:", error);
+
+      throw new Error(error.message);
+    }
+
+    console.log(`✅ Payslip email sent successfully to ${to}`, data);
+
+    return data;
+  } catch (error) {
+    console.error("❌ sendPayslipEmail Error:", error);
+
+    throw error;
+  }
 };
 
 // --- Generate working days between two dates excluding weekends & holidays ---
@@ -81,7 +98,7 @@ const getWorkingDaysBetween = async (startDate, endDate) => {
     date: { $gte: startDate.toDate(), $lte: endDate.toDate() },
   });
   const holidaySet = new Set(
-    holidays.map((h) => moment(h.date).format("YYYY-MM-DD"))
+    holidays.map((h) => moment(h.date).format("YYYY-MM-DD")),
   );
 
   const workingDays = [];
@@ -225,7 +242,7 @@ export const createMonthlyPayslip = async (req, res) => {
 
     const fileName = `${employee.employeeId}-${monthYear.replace(
       /\s+/g,
-      "-"
+      "-",
     )}-Payslip.pdf`;
     const fileKey = `payslips/${employee.employeeId}/${fileName}`;
 
@@ -235,7 +252,7 @@ export const createMonthlyPayslip = async (req, res) => {
         Key: fileKey,
         Body: pdfBuffer,
         ContentType: "application/pdf",
-      })
+      }),
     );
 
     const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.filebase.com/${fileKey}`;
@@ -340,7 +357,7 @@ export const getAllEmployeeMonthlyPayslip = async (req, res) => {
           } catch (err) {
             console.warn(
               `Failed to get avatar presigned URL for ${p.employeeId}`,
-              err.message
+              err.message,
             );
           }
         }
@@ -351,7 +368,7 @@ export const getAllEmployeeMonthlyPayslip = async (req, res) => {
           } catch (err) {
             console.warn(
               `Failed to get payslip presigned URL for ${p.employeeId}`,
-              err.message
+              err.message,
             );
           }
         }
@@ -377,7 +394,7 @@ export const getAllEmployeeMonthlyPayslip = async (req, res) => {
           emailedAt: p.emailedAt,
           avatar,
         };
-      })
+      }),
     );
 
     return res.status(200).json({

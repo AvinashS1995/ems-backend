@@ -1,6 +1,7 @@
 import { User } from "../Models/UserModel.js";
 import Attendance from "../Models/attendenceModel.js";
 import OTP from "../Models/otpModel.js";
+import resend from "../mail/resend.js";
 import transporter from "../mail/transporter.js";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
@@ -32,10 +33,29 @@ const sendCheckInsOtp = async (req, res) => {
     // console.log(process.env);
 
     // Send Email
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: "🕒 Attendance Check-In OTP",
+    //     const mailOptions = {
+    //       from: process.env.EMAIL_USER,
+    //       to: email,
+    //       subject: "🕒 Attendance Check-In OTP",
+    //       html: `
+    // <div style="max-width: 600px; margin: auto; padding: 20px; font-family: 'Segoe UI', sans-serif;
+    //             background-color: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 10px;">
+    //   <h2 style="text-align:center; color:#2e7d32;">Check-In OTP</h2>
+    //   <p style="text-align:center; font-size:16px;">Use the below OTP to verify your attendance check-in.</p>
+    //   <div style="text-align:center; margin: 20px 0;">
+    //     <span style="font-size:36px; color:#43a047; font-weight:bold;">${otpCode}</span>
+    //   </div>
+    //   <p style="text-align:center; font-size:14px; color:#555;">This OTP is valid for <strong>5 minutes</strong>. Keep it confidential.</p>
+    //   <hr style="margin: 20px 0;">
+    //   <p style="text-align:center; font-size:12px; color:#888;">Thank you for using EMS - Attendance Module.</p>
+    // </div>
+    // `,
+    //     };
+
+    const { data, error } = await resend.emails.send({
+      from: `EMS <${process.env.RESEND_EMAIL_FROM}>`,
+      to: [email],
+      subject: "🔐 🕒 Attendance Check-In OTP",
       html: `
 <div style="max-width: 600px; margin: auto; padding: 20px; font-family: 'Segoe UI', sans-serif; 
             background-color: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 10px;">
@@ -49,22 +69,31 @@ const sendCheckInsOtp = async (req, res) => {
   <p style="text-align:center; font-size:12px; color:#888;">Thank you for using EMS - Attendance Module.</p>
 </div>
 `,
-    };
-
-    transporter.sendMail(mailOptions, (err, info) => {
-      if (err) {
-        console.log(err);
-        return res.status(500).json({
-          status: "fail",
-          message: err.message,
-        });
-      }
-
-      return res.status(200).json({
-        status: "success",
-        message: "Check Ins OTP Successfully send on your Registered Email.",
-      });
     });
+
+    if (error) {
+      console.error("❌ Resend OTP Email Error:", error);
+
+      return res.status(500).json({
+        status: "fail",
+        message: error.message,
+      });
+    }
+
+    // transporter.sendMail(mailOptions, (err, info) => {
+    //   if (err) {
+    //     console.log(err);
+    //     return res.status(500).json({
+    //       status: "fail",
+    //       message: err.message,
+    //     });
+    //   }
+
+    return res.status(200).json({
+      status: "success",
+      message: "Check Ins OTP Successfully send on your Registered Email.",
+    });
+    // });
   } catch (error) {
     // console.log(error);
     return res.status(500).json({
@@ -197,8 +226,8 @@ const checkOut = async (req, res) => {
         totalMs += duration;
         console.log(
           `Session ${i + 1}: ${moment(s.checkIn).format()} - ${moment(
-            s.checkOut
-          ).format()} = ${moment.duration(duration).humanize()}`
+            s.checkOut,
+          ).format()} = ${moment.duration(duration).humanize()}`,
         );
       }
     });
@@ -208,7 +237,7 @@ const checkOut = async (req, res) => {
     const minutes = Math.floor(duration.minutes());
     const seconds = Math.floor(duration.seconds());
     const totalWorkedHours = `${String(hours).padStart(2, "0")}:${String(
-      minutes
+      minutes,
     ).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
     console.log(totalWorkedHours);
@@ -371,10 +400,10 @@ const attendanceSummary = async (req, res) => {
 
     // Present and Late
     const presentCount = attendancesToday.filter(
-      (a) => a.status === "Present"
+      (a) => a.status === "Present",
     ).length;
     const lateCount = attendancesToday.filter(
-      (a) => a.status === "Late"
+      (a) => a.status === "Late",
     ).length;
 
     // Absent = total employees - (present + late)

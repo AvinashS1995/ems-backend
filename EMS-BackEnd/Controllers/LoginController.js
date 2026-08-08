@@ -6,6 +6,7 @@ import transporter from "../mail/transporter.js";
 import dotenv from "dotenv";
 import { generateRandomKey, encrypt } from "../common/common.js";
 import { getPresignedUrl } from "../storage/s3.config.js";
+import resend from "../mail/resend.js";
 
 dotenv.config({ path: "./.env" });
 
@@ -77,7 +78,7 @@ const Login = async (req, res) => {
         loginUserSecretKey: secretKey,
       },
       process.env.JWT_SECRET_KEY,
-      { expiresIn: "10d" }
+      { expiresIn: "10d" },
     );
 
     return res.status(200).json({
@@ -149,9 +150,36 @@ const sendOtp = async (req, res) => {
     await OTP.create({ email, otp: hashedOtp, expiresAt });
 
     // Send Email
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
+    //     const mailOptions = {
+    //       from: process.env.RESEND_EMAIL_FROM,
+    //       to: email,
+    //       subject: "🔐 Reset Password - OTP Authentication",
+    //       html: `
+    // <div style="max-width: 600px; margin: auto; padding: 20px; font-family: 'Segoe UI', sans-serif;
+    //             background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 10px;">
+    //   <h2 style="text-align:center; color:#4285F4;">Reset Your Password</h2>
+    //   <p style="text-align:center; font-size:16px;">Use the OTP below to reset your EMS account password.</p>
+    //   <div style="text-align:center; margin: 20px 0;">
+    //     <span style="font-size:36px; color:#28a745; font-weight:bold;">${otpCode}</span>
+    //   </div>
+    //   <p style="text-align:center; font-size:14px; color:#555;">This OTP is valid for <strong>5 minutes</strong>. Please do not share it with anyone.</p>
+    //   <hr style="margin: 20px 0;">
+    //   <p style="text-align:center; font-size:12px; color:#888;">Need help? Contact <a href="mailto:support@employeemanagementsystem.com" style="color:#4285F4;">support@employeemanagementsystem.com</a></p>
+    // </div>
+    // `,
+    //     };
+
+    // transporter.sendMail(mailOptions, (err, info) => {
+    //   if (err) {
+    //     return res.status(500).json({
+    //       status: "fail",
+    //       message: err.message,
+    //     });
+    //   }
+
+    const { data, error } = await resend.emails.send({
+      from: `EMS <${process.env.RESEND_EMAIL_FROM}>`,
+      to: [email],
       subject: "🔐 Reset Password - OTP Authentication",
       html: `
 <div style="max-width: 600px; margin: auto; padding: 20px; font-family: 'Segoe UI', sans-serif; 
@@ -166,21 +194,22 @@ const sendOtp = async (req, res) => {
   <p style="text-align:center; font-size:12px; color:#888;">Need help? Contact <a href="mailto:support@employeemanagementsystem.com" style="color:#4285F4;">support@employeemanagementsystem.com</a></p>
 </div>
 `,
-    };
-
-    transporter.sendMail(mailOptions, (err, info) => {
-      if (err) {
-        return res.status(500).json({
-          status: "fail",
-          message: err.message,
-        });
-      }
-
-      return res.status(200).json({
-        status: "success",
-        message: "OTP Successfully send on your Registered Email.",
-      });
     });
+
+    if (error) {
+      console.error("❌ Resend OTP Email Error:", error);
+
+      return res.status(500).json({
+        status: "fail",
+        message: error.message,
+      });
+    }
+
+    return res.status(200).json({
+      status: "success",
+      message: "OTP Successfully send on your Registered Email.",
+    });
+    // });
   } catch (error) {
     return res.status(500).json({
       status: "fail",
@@ -205,13 +234,32 @@ const resendOtp = async (req, res) => {
     await OTP.findOneAndUpdate(
       { email },
       { otp: hashedOtp, expiresAt: new Date(Date.now() + 5 * 60 * 1000) },
-      { upsert: true }
+      { upsert: true },
     );
 
     // Send Email
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
+    //     const mailOptions = {
+    //       from: process.env.EMAIL_USER,
+    //       to: email,
+    //       subject: "📩 Resent OTP - Reset Your Password",
+    //       html: `
+    // <div style="max-width: 600px; margin: auto; padding: 20px; font-family: 'Segoe UI', sans-serif;
+    //             background-color: #fff8f0; border: 1px solid #ffd7b5; border-radius: 10px;">
+    //   <h2 style="text-align:center; color:#FF9800;">Here's Your New OTP</h2>
+    //   <p style="text-align:center; font-size:16px;">You requested a new OTP to reset your EMS password.</p>
+    //   <div style="text-align:center; margin: 20px 0;">
+    //     <span style="font-size:36px; color:#ff5722; font-weight:bold;">${otpCode}</span>
+    //   </div>
+    //   <p style="text-align:center; font-size:14px; color:#555;">This OTP will expire in <strong>5 minutes</strong>.</p>
+    //   <hr style="margin: 20px 0;">
+    //   <p style="text-align:center; font-size:12px; color:#888;">If you didn't request this, please ignore the email.</p>
+    // </div>
+    // `,
+    //     };
+
+    const { data, error } = await resend.emails.send({
+      from: `EMS <${process.env.RESEND_EMAIL_FROM}>`,
+      to: [email],
       subject: "📩 Resent OTP - Reset Your Password",
       html: `
 <div style="max-width: 600px; margin: auto; padding: 20px; font-family: 'Segoe UI', sans-serif; 
@@ -226,22 +274,31 @@ const resendOtp = async (req, res) => {
   <p style="text-align:center; font-size:12px; color:#888;">If you didn't request this, please ignore the email.</p>
 </div>
 `,
-    };
-
-    transporter.sendMail(mailOptions, (err, info) => {
-      if (err) {
-        console.log(err);
-        return res.status(500).json({
-          status: "fail",
-          message: err.message,
-        });
-      }
-
-      return res.status(200).json({
-        status: "success",
-        message: "OTP Successfully Resend on your Registered Email.",
-      });
     });
+
+    if (error) {
+      console.error("❌ Resend OTP Email Error:", error);
+
+      return res.status(500).json({
+        status: "fail",
+        message: error.message,
+      });
+    }
+
+    // transporter.sendMail(mailOptions, (err, info) => {
+    // if (err) {
+    //   console.log(err);
+    //   return res.status(500).json({
+    //     status: "fail",
+    //     message: err.message,
+    //   });
+    // }
+
+    return res.status(200).json({
+      status: "success",
+      message: "OTP Successfully Resend on your Registered Email.",
+    });
+    // });
   } catch (error) {
     return res.status(500).json({
       status: "fail",

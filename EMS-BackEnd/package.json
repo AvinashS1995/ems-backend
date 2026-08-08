@@ -31,6 +31,7 @@
     "otp-generator": "^4.0.1",
     "path": "^0.12.7",
     "puppeteer": "^24.17.0",
+    "resend": "^6.18.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "ua-parser-js": "^2.0.6"
