@@ -2,6 +2,8 @@ import { User } from "../Models/UserModel.js";
 import { EmployeeUrlMeeting, Meeting } from "../Models/meetingModel.js";
 import sendEmail from "../mail/sendMailforMeeting.js";
 import { getPresignedUrl } from "../storage/s3.config.js";
+import { createNotification } from "../common/NotificationService.js";
+import { NOTIFICATION_EVENTS } from "../common/notificationConstant.js";
 
 const DEFAULT_AVATAR =
   "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png";
@@ -36,7 +38,7 @@ const saveMeetingSchedule = async (req, res) => {
           };
         }
         return attendee;
-      })
+      }),
     );
 
     if (meetingType === "Online") {
@@ -55,7 +57,7 @@ const saveMeetingSchedule = async (req, res) => {
       }
 
       const platformEntry = existingMeetingRecord.platforms.find(
-        (p) => p.platform === platform
+        (p) => p.platform === platform,
       );
 
       if (!platformEntry) {
@@ -85,7 +87,75 @@ const saveMeetingSchedule = async (req, res) => {
     await newMeeting.save();
 
     for (const attendee of enhancedAttendees) {
+      // Organizer ला notification/email skip करायचा असल्यास
+      if (attendee.empNo === empNo) {
+        continue;
+      }
+
       const isOnline = meetingType === "Online";
+
+      const attendeeUser = await User.findOne({
+        empNo: attendee.empNo,
+      });
+
+      if (!attendeeUser) {
+        continue;
+      }
+
+      // ========================================
+      // NOTIFICATION
+      // ========================================
+      const organizer = await User.findOne({ empNo: empNo });
+      try {
+        await createNotification({
+          title: "New Meeting Scheduled",
+
+          message: `${title} has been scheduled for ${new Date(
+            date,
+          ).toLocaleDateString("en-IN")} from ${startTime} to ${endTime}.`,
+
+          module: "Meeting",
+
+          event: NOTIFICATION_EVENTS.MEETING_SCHEDULED,
+
+          recipientEmployee: attendeeUser.empNo,
+
+          recipientEmail: attendeeUser.email,
+
+          createdByEmployee: organizer.empNo,
+
+          createdByName: organizer.name,
+
+          icon: isOnline ? "videocam" : "event",
+
+          color: "#2196F3",
+
+          route: "/meeting-schedule",
+
+          referenceId: newMeeting._id.toString(),
+
+          referenceType: "Meeting",
+
+          metadata: {
+            meetingId: newMeeting._id,
+            title,
+            date,
+            startTime,
+            endTime,
+            meetingType,
+            platform,
+            location: finalLocation,
+            meetingLink,
+            description,
+            organizerEmpNo: empNo,
+          },
+        });
+      } catch (notificationError) {
+        console.error(
+          `Notification failed for ${attendee.empNo}:`,
+          notificationError.message,
+        );
+      }
       const dateFormatted = new Date(date).toLocaleDateString("en-IN", {
         weekday: "long",
         day: "2-digit",
@@ -211,7 +281,7 @@ const getAllMeetingSchedule = async (req, res) => {
               } catch (err) {
                 console.warn(
                   `Failed to get presigned URL for ${attendee.empNo}`,
-                  err.message
+                  err.message,
                 );
               }
             }
@@ -220,14 +290,14 @@ const getAllMeetingSchedule = async (req, res) => {
               ...(attendee.toObject?.() || attendee),
               avatar,
             };
-          })
+          }),
         );
 
         return {
           ...meeting.toObject(),
           attendees: enrichedAttendees,
         };
-      })
+      }),
     );
 
     res.status(200).json({
@@ -247,6 +317,65 @@ const getAllMeetingSchedule = async (req, res) => {
 const deleteMeetingSchedule = async (req, res) => {
   try {
     const { id } = req.body;
+
+    // ========================================
+    // NOTIFY ATTENDEES BEFORE DELETE
+    // ========================================
+
+    for (const attendee of meeting.attendees) {
+      try {
+        const attendeeUser = await User.findOne({
+          empNo: attendee.empNo,
+        });
+
+        if (!attendeeUser) continue;
+
+        await createNotification({
+          title: "Meeting Cancelled",
+
+          message: `${meeting.title} scheduled for ${new Date(
+            meeting.date,
+          ).toLocaleDateString("en-IN")} has been cancelled.`,
+
+          module: "Meeting",
+
+          event: NOTIFICATION_EVENTS.MEETING_CANCELLED,
+
+          recipientEmployee: attendeeUser.empNo,
+
+          recipientEmail: attendeeUser.email,
+
+          createdByEmployee: meeting.createdBy,
+
+          createdByName: "Meeting Organizer",
+
+          icon: "event_busy",
+
+          color: "#F44336",
+
+          route: "/meeting-schedule",
+
+          referenceId: meeting._id.toString(),
+
+          referenceType: "Meeting",
+
+          metadata: {
+            meetingId: meeting._id,
+            title: meeting.title,
+            date: meeting.date,
+            startTime: meeting.startTime,
+            endTime: meeting.endTime,
+            meetingType: meeting.meetingType,
+          },
+        });
+      } catch (notificationError) {
+        console.error(
+          `Meeting cancellation notification failed for ${attendee.empNo}:`,
+          notificationError.message,
+        );
+      }
+    }
+
     await Meeting.findByIdAndDelete(id);
     res.status(200).json({
       status: "success",
@@ -288,7 +417,7 @@ const updateMeetingSchedule = async (req, res) => {
         description,
         attendees,
       },
-      { new: true }
+      { new: true },
     );
 
     if (!updatedMeeting) {
@@ -296,6 +425,58 @@ const updateMeetingSchedule = async (req, res) => {
         status: "fail",
         message: "Meeting not found",
       });
+    }
+
+    for (const attendee of updatedMeeting.attendees) {
+      try {
+        const attendeeUser = await User.findOne({
+          empNo: attendee.empNo,
+        });
+
+        if (!attendeeUser) continue;
+
+        await createNotification({
+          title: "Meeting Updated",
+
+          message: `${updatedMeeting.title} has been updated. Please check the new meeting details.`,
+
+          module: "Meeting",
+
+          event: NOTIFICATION_EVENTS.MEETING_UPDATED,
+
+          recipientEmployee: attendeeUser.empNo,
+
+          recipientEmail: attendeeUser.email,
+
+          createdByEmployee: updatedMeeting.createdBy,
+
+          createdByName: "Meeting Organizer",
+
+          icon: "event_note",
+
+          color: "#FF9800",
+
+          route: "/meeting-schedule",
+
+          referenceId: updatedMeeting._id.toString(),
+
+          referenceType: "Meeting",
+
+          metadata: {
+            meetingId: updatedMeeting._id,
+            title: updatedMeeting.title,
+            date: updatedMeeting.date,
+            startTime: updatedMeeting.startTime,
+            endTime: updatedMeeting.endTime,
+            meetingType: updatedMeeting.meetingType,
+          },
+        });
+      } catch (notificationError) {
+        console.error(
+          `Meeting update notification failed for ${attendee.empNo}:`,
+          notificationError.message,
+        );
+      }
     }
 
     res.status(200).json({
@@ -328,7 +509,7 @@ const saveOrUpdateEmployeeMeetingUrl = async (req, res) => {
 
     if (employee) {
       const existingPlatform = employee.platforms.find(
-        (p) => p.platform === platform
+        (p) => p.platform === platform,
       );
 
       if (existingPlatform) {

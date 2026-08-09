@@ -1,6 +1,8 @@
 import { User } from "../Models/UserModel.js";
 import Attendance from "../Models/attendenceModel.js";
 import OTP from "../Models/otpModel.js";
+import { createNotification } from "../common/NotificationService.js";
+import { NOTIFICATION_EVENTS } from "../common/notificationConstant.js";
 import resend from "../mail/resend.js";
 import transporter from "../mail/transporter.js";
 import bcrypt from "bcrypt";
@@ -177,6 +179,53 @@ const verifyCheckInsOtp = async (req, res) => {
 
     await attendance.save();
 
+    // ========================================
+    // CREATE ATTENDANCE NOTIFICATION
+    // ========================================
+
+    try {
+      const isLate = currentTime.isAfter(LATE_LIMIT);
+
+      await createNotification({
+        title: isLate ? "Late Arrival" : "Attendance Check-In",
+
+        message: isLate
+          ? `You checked in at ${currentTime.format(
+              "hh:mm A",
+            )}. Your attendance has been marked as Late.`
+          : `You successfully checked in at ${currentTime.format("hh:mm A")}.`,
+
+        module: "Attendance",
+
+        event: isLate
+          ? NOTIFICATION_EVENTS.ATTENDANCE_LATE
+          : NOTIFICATION_EVENTS.ATTENDANCE_CHECK_IN,
+
+        recipientEmployee: user.empNo,
+
+        recipientEmail: user.email,
+
+        createdByEmployee: user.empNo,
+
+        createdByName: `${user.firstName} ${user.lastName}`,
+
+        icon: isLate ? "schedule" : "login",
+
+        color: isLate ? "#FF9800" : "#4CAF50",
+
+        route: "/attendance",
+
+        referenceId: attendance._id.toString(),
+
+        referenceType: "Attendance",
+      });
+    } catch (notificationError) {
+      console.error(
+        "Attendance notification error:",
+        notificationError.message,
+      );
+    }
+
     res.status(200).json({
       status: "success",
       message: `Check-in successful.`,
@@ -254,6 +303,55 @@ const checkOut = async (req, res) => {
     attendance.status = status;
 
     await attendance.save();
+
+    // ========================================
+    // CREATE CHECK-OUT NOTIFICATION
+    // ========================================
+
+    try {
+      // const user = await User.findOne({ email });
+
+      // if (user) {
+      await createNotification({
+        title: "Attendance Check-Out",
+
+        message: `You successfully checked out at ${checkOutTime.format(
+          "hh:mm A",
+        )}. Total worked hours: ${totalWorkedHours}.`,
+
+        module: "Attendance",
+
+        event: NOTIFICATION_EVENTS.ATTENDANCE_CHECK_OUT,
+
+        recipientEmployee: user.empNo,
+
+        recipientEmail: user.email,
+
+        createdByEmployee: user.empNo,
+
+        createdByName: `${user.firstName} ${user.lastName}`,
+
+        icon: "logout",
+
+        color: "#2196F3",
+
+        route: "/attendance",
+
+        referenceId: attendance._id.toString(),
+
+        referenceType: "Attendance",
+
+        metadata: {
+          checkInTime: attendance.checkInTime,
+          checkOutTime: attendance.checkOutTime,
+          totalWorkedHours,
+          status,
+        },
+      });
+      // }
+    } catch (notificationError) {
+      console.error("Check-out notification error:", notificationError.message);
+    }
 
     return res.status(200).json({
       status: "success",

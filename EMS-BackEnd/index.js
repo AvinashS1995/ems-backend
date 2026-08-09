@@ -16,6 +16,7 @@ import weatherRoutes from "./Routes/weatherRoute.js";
 import invoiceRoutes from "./Routes/invoiceRoute.js";
 import portfolioRoutes from "./Routes/poerfolioRoute.js";
 import workTrackingsRoutes from "./Routes/workTrackingsRoute.js";
+import notificationsRoutes from "./Routes/notificationRoute.js";
 import { ConnectToDatabase } from "./db/db.js";
 import setupSwagger from "./swagger/swagger.js";
 import startCron from "./crons/cronRun.js";
@@ -54,6 +55,8 @@ app.use("/api/weather", weatherRoutes);
 app.use("/api/invoice", invoiceRoutes);
 app.use("/api/portfolio", portfolioRoutes);
 app.use("/api/work-trackings", workTrackingsRoutes);
+app.use("/api/work-trackings", workTrackingsRoutes);
+app.use("/api/notifications", notificationsRoutes);
 
 setupSwagger(app);
 

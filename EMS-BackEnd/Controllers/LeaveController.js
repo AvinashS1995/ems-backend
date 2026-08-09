@@ -4,6 +4,8 @@ import { Holidays } from "../Models/holidayModel.js";
 import { Leave, LeaveBalance } from "../Models/leaveModel.js";
 import { User } from "../Models/UserModel.js";
 import { sendLeaveEmail } from "../mail/sendMailLeaveStatusToEmployee.js";
+import { createNotification } from "../common/NotificationService.js";
+import { NOTIFICATION_EVENTS } from "../common/notificationConstant.js";
 
 const typeMap = {
   "Paid Leaves (PL)": "Leave",
@@ -107,17 +109,17 @@ const saveEmployeeLeave = async (req, res) => {
         if (leaveType.includes("Casual")) {
           leaveBalance.casualLeave = Math.max(
             Number(leaveBalance.casualLeave || 0) - totalDays,
-            0
+            0,
           );
         } else if (leaveType.includes("Sick")) {
           leaveBalance.sickLeave = Math.max(
             Number(leaveBalance.sickLeave || 0) - totalDays,
-            0
+            0,
           );
         } else if (leaveType.includes("Paid")) {
           leaveBalance.paidLeave = Math.max(
             Number(leaveBalance.paidLeave || 0) - totalDays,
-            0
+            0,
           );
         }
 
@@ -151,7 +153,7 @@ const saveEmployeeLeave = async (req, res) => {
       empNo,
       approvalFlow.listApprovalFlowDetails,
       initialStatus,
-      employee.role // this role will be skipped in stepper
+      employee.role, // this role will be skipped in stepper
     );
 
     // 6. Construct the full approvalStatus array
@@ -186,6 +188,73 @@ const saveEmployeeLeave = async (req, res) => {
     });
 
     const savedLeave = await newLeave.save();
+
+    // ========================================
+    // CREATE LEAVE APPLICATION NOTIFICATION
+    // ========================================
+
+    try {
+      // First pending approver
+      const firstPendingApprover = stepperData.find(
+        (step) => step.status === "Pending",
+      );
+
+      if (firstPendingApprover) {
+        const approver = await User.findOne({
+          empNo: firstPendingApprover.empNo,
+        });
+
+        if (approver) {
+          await createNotification({
+            title: "New Leave Request",
+
+            message: `${employee.firstName} ${employee.lastName} has applied for ${leaveType} from ${new Date(
+              fromDate,
+            ).toLocaleDateString("en-IN")} to ${new Date(
+              toDate,
+            ).toLocaleDateString("en-IN")}.`,
+
+            module: "Leave",
+
+            event: NOTIFICATION_EVENTS.LEAVE_APPLIED,
+
+            recipientEmployee: approver.empNo,
+
+            recipientEmail: approver.email,
+
+            createdByEmployee: employee.empNo,
+
+            createdByName: `${employee.firstName} ${employee.lastName}`,
+
+            icon: "event_available",
+
+            color: "#2196F3",
+
+            route: "/leave-management",
+
+            referenceId: savedLeave._id.toString(),
+
+            referenceType: "Leave",
+
+            metadata: {
+              leaveId: savedLeave._id,
+              leaveType,
+              leaveDuration,
+              fromDate,
+              toDate,
+              reasonType,
+              reasonComment,
+              applicantEmpNo: employee.empNo,
+            },
+          });
+        }
+      }
+    } catch (notificationError) {
+      console.error(
+        "Leave application notification error:",
+        notificationError.message,
+      );
+    }
 
     // 9. Respond
     res.status(201).json({
@@ -246,7 +315,7 @@ const approvalFlow = async (req, res) => {
       employee.empNo,
       approvalFlow.listApprovalFlowDetails,
       leave.approvalStatus,
-      employee.role
+      employee.role,
     );
 
     // You can send back relevant info about the approval flow:
@@ -319,7 +388,7 @@ const approveRejectLeave = async (req, res) => {
       (step) =>
         step.empNo === approverEmpNo &&
         step.role === role &&
-        step.status !== "Pending"
+        step.status !== "Pending",
     );
 
     if (alreadyActed) {
@@ -335,7 +404,7 @@ const approveRejectLeave = async (req, res) => {
           s.empNo === approverEmpNo &&
           s.role === role &&
           s.status === "Pending"
-        )
+        ),
     );
 
     // Add current approver action
@@ -357,7 +426,7 @@ const approveRejectLeave = async (req, res) => {
       leave.empNo,
       flowSteps,
       leave.approvalStatus,
-      approver.role
+      approver.role,
     );
 
     // Find next pending approver
@@ -373,7 +442,7 @@ const approveRejectLeave = async (req, res) => {
         const leaveDays =
           Math.ceil(
             (new Date(leave.toDate) - new Date(leave.fromDate)) /
-              (1000 * 60 * 60 * 24)
+              (1000 * 60 * 60 * 24),
           ) + 1; // inclusive days
 
         if (leave.leaveType.includes("Casual")) {
@@ -403,6 +472,62 @@ const approveRejectLeave = async (req, res) => {
         //   isActive: true,
         // });
 
+        // ========================================
+        // LEAVE REJECTED NOTIFICATION
+        // ========================================
+
+        try {
+          await createNotification({
+            title: "Leave Rejected",
+
+            message: `Your ${leave.leaveType} request from ${new Date(
+              leave.fromDate,
+            ).toLocaleDateString("en-IN")} to ${new Date(
+              leave.toDate,
+            ).toLocaleDateString(
+              "en-IN",
+            )} has been rejected by ${approver.firstName} ${approver.lastName}.`,
+
+            module: "Leave",
+
+            event: NOTIFICATION_EVENTS.LEAVE_REJECTED,
+
+            recipientEmployee: applicant.empNo,
+
+            recipientEmail: applicant.email,
+
+            createdByEmployee: approver.empNo,
+
+            createdByName: `${approver.firstName} ${approver.lastName}`,
+
+            icon: "event_busy",
+
+            color: "#F44336",
+
+            route: "/leave-management",
+
+            referenceId: leave._id.toString(),
+
+            referenceType: "Leave",
+
+            metadata: {
+              leaveId: leave._id,
+              leaveType: leave.leaveType,
+              fromDate: leave.fromDate,
+              toDate: leave.toDate,
+              approverEmpNo,
+              approverRole: role,
+              comments,
+              status: "Rejected",
+            },
+          });
+        } catch (notificationError) {
+          console.error(
+            "Leave rejection notification error:",
+            notificationError.message,
+          );
+        }
+
         await sendLeaveEmail({
           to: applicant.email,
           name: `${applicant.firstName} ${applicant.lastName}`,
@@ -413,6 +538,60 @@ const approveRejectLeave = async (req, res) => {
       leave.status = "Approved";
 
       if (applicant) {
+        // ========================================
+        // LEAVE APPROVED NOTIFICATION
+        // ========================================
+
+        try {
+          await createNotification({
+            title: "Leave Approved",
+
+            message: `Your ${leave.leaveType} request from ${new Date(
+              leave.fromDate,
+            ).toLocaleDateString("en-IN")} to ${new Date(
+              leave.toDate,
+            ).toLocaleDateString("en-IN")} has been approved.`,
+
+            module: "Leave",
+
+            event: NOTIFICATION_EVENTS.LEAVE_APPROVED,
+
+            recipientEmployee: applicant.empNo,
+
+            recipientEmail: applicant.email,
+
+            createdByEmployee: approver.empNo,
+
+            createdByName: `${approver.firstName} ${approver.lastName}`,
+
+            icon: "event_available",
+
+            color: "#4CAF50",
+
+            route: "/leave-management",
+
+            referenceId: leave._id.toString(),
+
+            referenceType: "Leave",
+
+            metadata: {
+              leaveId: leave._id,
+              leaveType: leave.leaveType,
+              fromDate: leave.fromDate,
+              toDate: leave.toDate,
+              approverEmpNo,
+              approverRole: role,
+              comments,
+              status: "Approved",
+            },
+          });
+        } catch (notificationError) {
+          console.error(
+            "Leave approval notification error:",
+            notificationError.message,
+          );
+        }
+
         await sendLeaveEmail({
           to: applicant.email,
           name: `${applicant.firstName} ${applicant.lastName}`,
@@ -428,7 +607,7 @@ const approveRejectLeave = async (req, res) => {
     } else {
       // Check if already exists in approvalStatus
       const alreadyExists = leave.approvalStatus.some(
-        (s) => s.empNo === nextPending.empNo && s.role === nextPending.role
+        (s) => s.empNo === nextPending.empNo && s.role === nextPending.role,
       );
 
       if (!alreadyExists) {
@@ -443,6 +622,65 @@ const approveRejectLeave = async (req, res) => {
       }
 
       leave.status = `Pending for ${nextPending.role}`;
+
+      // ========================================
+      // NOTIFY NEXT APPROVER
+      // ========================================
+
+      try {
+        const nextApprover = await User.findOne({
+          empNo: nextPending.empNo,
+        });
+
+        if (nextApprover) {
+          await createNotification({
+            title: "Leave Approval Required",
+
+            message: `${applicant?.firstName || leave.name} ${
+              applicant?.lastName || ""
+            }'s ${leave.leaveType} request requires your approval.`,
+
+            module: "Leave",
+
+            event: NOTIFICATION_EVENTS.LEAVE_APPROVAL_PENDING,
+
+            recipientEmployee: nextApprover.empNo,
+
+            recipientEmail: nextApprover.email,
+
+            createdByEmployee: approver.empNo,
+
+            createdByName: `${approver.firstName} ${approver.lastName}`,
+
+            icon: "approval",
+
+            color: "#FF9800",
+
+            route: "/leave-request",
+
+            referenceId: leave._id.toString(),
+
+            referenceType: "Leave",
+
+            metadata: {
+              leaveId: leave._id,
+              applicantEmpNo: leave.empNo,
+              applicantName: leave.name,
+              leaveType: leave.leaveType,
+              fromDate: leave.fromDate,
+              toDate: leave.toDate,
+              previousApprover: approverEmpNo,
+              nextApprover: nextApprover.empNo,
+              status: "Pending",
+            },
+          });
+        }
+      } catch (notificationError) {
+        console.error(
+          "Next leave approver notification error:",
+          notificationError.message,
+        );
+      }
     }
 
     leave.updatedBy = approverEmpNo;

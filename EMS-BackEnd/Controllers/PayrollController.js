@@ -15,6 +15,8 @@ import {
 import path from "path";
 import { Holidays } from "../Models/holidayModel.js";
 import Attendance from "../Models/attendenceModel.js";
+import { NOTIFICATION_EVENTS } from "../common/notificationConstant.js";
+import { createNotification } from "../common/NotificationService.js";
 
 dotenv.config({ path: "./.env" });
 
@@ -305,6 +307,60 @@ export const createMonthlyPayslip = async (req, res) => {
     });
 
     await payslipRecord.save();
+
+    // ========================================
+    // CREATE PAYSLIP NOTIFICATION
+    // ========================================
+
+    try {
+      await createNotification({
+        title: "Payslip Generated",
+
+        message: `Your payslip for ${monthYear} has been generated successfully.`,
+
+        module: "Payroll",
+
+        event: NOTIFICATION_EVENTS.PAYSLIP_GENERATED,
+
+        recipientEmployee: user.empNo,
+
+        recipientEmail: user.email,
+
+        createdByEmployee: user.empNo,
+
+        createdByName: "HR Department",
+
+        icon: "payments",
+
+        color: "#4CAF50",
+
+        route: "/payslips",
+
+        referenceId: payslipRecord._id.toString(),
+
+        referenceType: "Payslip",
+
+        metadata: {
+          payslipId: payslipRecord._id,
+          employeeId: user.empNo,
+          monthYear,
+          periodMonth: payslipRecord.periodMonth,
+          periodYear: payslipRecord.periodYear,
+          grossEarnings: payslipRecord.grossEarnings,
+          totalDeductions: payslipRecord.totalDeductions,
+          netPay: payslipRecord.netPay,
+          fileKey: payslipRecord.fileKey,
+        },
+      });
+
+      console.log(`✅ Payslip notification created for ${user.empNo}`);
+    } catch (notificationError) {
+      // Notification failure should NOT fail payslip generation
+      console.error(
+        `❌ Payslip notification failed for ${user.empNo}:`,
+        notificationError.message,
+      );
+    }
 
     return res
       .status(200)

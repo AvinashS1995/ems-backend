@@ -1,5 +1,7 @@
 import { generateId, generateTaskId } from "../common/common.js";
 import { getApprovalStepManagetToEmployees } from "../common/employee.utilis.js";
+import { NOTIFICATION_EVENTS } from "../common/notificationConstant.js";
+import { createNotification } from "../common/NotificationService.js";
 import { ApprovalFlow } from "../Models/approvalModel.js";
 import { Projects } from "../Models/projectTaskModel.js";
 import { User } from "../Models/UserModel.js";
@@ -76,7 +78,7 @@ export const createProject = async (req, res) => {
       creator.empNo,
       approvalFlow.listApprovalFlowDetails,
       initialStatus,
-      creator.role
+      creator.role,
     );
 
     console.log(stepperData);
@@ -118,6 +120,63 @@ export const createProject = async (req, res) => {
 
     await newProject.save();
 
+    // ========================================
+    // PROJECT CREATED / APPROVAL NOTIFICATION
+    // ========================================
+
+    try {
+      const firstPendingApprover = approvalStatus.find(
+        (step) => step.status === "Pending",
+      );
+
+      if (firstPendingApprover?.empNo) {
+        await createNotification({
+          title: "Project Assignment Approval Required",
+
+          message: `${creator.firstName} ${creator.lastName} submitted project "${title}" for your approval.`,
+
+          module: "Project",
+
+          event: NOTIFICATION_EVENTS.PROJECT_APPROVAL_PENDING,
+
+          recipientEmployee: firstPendingApprover.empNo,
+
+          recipientEmail: (
+            await User.findOne({ empNo: firstPendingApprover.empNo })
+          )?.email,
+
+          createdByEmployee: creator.empNo,
+
+          createdByName: `${creator.firstName} ${creator.lastName}`,
+
+          icon: "assignment",
+
+          color: "#2196F3",
+
+          route: "/project-task",
+
+          referenceId: newProject._id.toString(),
+
+          referenceType: "Project",
+
+          metadata: {
+            projectId,
+            projectTitle: title,
+            priority,
+            deadline,
+            createdBy: creator.empNo,
+            assignedTo: assignTo.empNo,
+            approvalRole: firstPendingApprover.role,
+          },
+        });
+      }
+    } catch (notificationError) {
+      console.error(
+        "❌ Project notification failed:",
+        notificationError.message,
+      );
+    }
+
     res.status(201).json({
       status: "success",
       message: "Project created successfully",
@@ -157,7 +216,7 @@ export const approveRejectProject = async (req, res) => {
       (step) =>
         step.empNo === approverEmpNo &&
         step.role === role &&
-        step.status !== "Pending"
+        step.status !== "Pending",
     );
     if (alreadyActed) {
       return res
@@ -172,7 +231,7 @@ export const approveRejectProject = async (req, res) => {
           s.empNo === approverEmpNo &&
           s.role === role &&
           s.status === "Pending"
-        )
+        ),
     );
 
     // Add current approver action
@@ -195,7 +254,7 @@ export const approveRejectProject = async (req, res) => {
       project.createdBy.empNo,
       flowSteps,
       project.approvalStatus,
-      approver.role
+      approver.role,
     );
 
     const nextPending = stepperData.find((step) => step.status === "Pending");
@@ -220,6 +279,151 @@ export const approveRejectProject = async (req, res) => {
     project.updateAt = new Date();
 
     const updatedProject = await project.save();
+
+    // ========================================
+    // PROJECT APPROVAL NOTIFICATION
+    // ========================================
+
+    try {
+      const creatorUser = await User.findOne({
+        empNo: project.createdBy.empNo,
+      });
+
+      // ----------------------------------------
+      // REJECTED
+      // ----------------------------------------
+
+      if (action === "Rejected") {
+        if (creatorUser) {
+          await createNotification({
+            title: "Project Rejected",
+
+            message: `Your project "${project.title}" was rejected by ${approver.firstName} ${approver.lastName}.`,
+
+            module: "Project",
+
+            event: NOTIFICATION_EVENTS.PROJECT_REJECTED,
+
+            recipientEmployee: creatorUser.empNo,
+
+            recipientEmail: creatorUser.email,
+
+            createdByEmployee: approver.empNo,
+
+            createdByName: `${approver.firstName} ${approver.lastName}`,
+
+            icon: "cancel",
+
+            color: "#F44336",
+
+            route: "/project-task",
+
+            referenceId: project._id.toString(),
+
+            referenceType: "Project",
+
+            metadata: {
+              projectId: project.projectId,
+              projectTitle: project.title,
+              rejectedBy: approver.empNo,
+              rejectedByRole: role,
+              comments,
+            },
+          });
+        }
+      }
+
+      // ----------------------------------------
+      // FULLY APPROVED
+      // ----------------------------------------
+      else if (!nextPending) {
+        if (creatorUser) {
+          await createNotification({
+            title: "Project Approved",
+
+            message: `Your project "${project.title}" has been approved successfully.`,
+
+            module: "Project",
+
+            event: NOTIFICATION_EVENTS.PROJECT_APPROVED,
+
+            recipientEmployee: creatorUser.empNo,
+
+            recipientEmail: creatorUser.email,
+
+            createdByEmployee: approver.empNo,
+
+            createdByName: `${approver.firstName} ${approver.lastName}`,
+
+            icon: "check_circle",
+
+            color: "#4CAF50",
+
+            route: "/project-task",
+
+            referenceId: project._id.toString(),
+
+            referenceType: "Project",
+
+            metadata: {
+              projectId: project.projectId,
+              projectTitle: project.title,
+              approvedBy: approver.empNo,
+            },
+          });
+        }
+      }
+
+      // ----------------------------------------
+      // NEXT APPROVER
+      // ----------------------------------------
+      else {
+        const nextApprover = await User.findOne({
+          empNo: nextPending.empNo,
+        });
+
+        if (nextApprover) {
+          await createNotification({
+            title: "Project Approval Required",
+
+            message: `Project "${project.title}" is waiting for your approval.`,
+
+            module: "Project",
+
+            event: NOTIFICATION_EVENTS.PROJECT_APPROVAL_PENDING,
+
+            recipientEmployee: nextApprover.empNo,
+
+            recipientEmail: nextApprover.email,
+
+            createdByEmployee: approver.empNo,
+
+            createdByName: `${approver.firstName} ${approver.lastName}`,
+
+            icon: "approval",
+
+            color: "#FF9800",
+
+            route: "/project-task",
+
+            referenceId: project._id.toString(),
+
+            referenceType: "Project",
+
+            metadata: {
+              projectId: project.projectId,
+              projectTitle: project.title,
+              approvalRole: nextPending.role,
+            },
+          });
+        }
+      }
+    } catch (notificationError) {
+      console.error(
+        "❌ Project approval notification failed:",
+        notificationError.message,
+      );
+    }
 
     res.status(200).json({
       status: "success",
@@ -328,7 +532,7 @@ export const createTask = async (req, res) => {
       creator.empNo,
       approvalFlow.listApprovalFlowDetails,
       initialStatus,
-      creator.role
+      creator.role,
     );
 
     console.log(stepperData);
@@ -376,6 +580,125 @@ export const createTask = async (req, res) => {
 
     await project.save();
 
+    // ========================================
+    // TASK CREATED NOTIFICATION
+    // ========================================
+
+    try {
+      const firstPendingApprover = approvalStatus.find(
+        (step) => step.status === "Pending",
+      );
+
+      // ----------------------------------------
+      // APPROVAL REQUIRED
+      // ----------------------------------------
+
+      if (firstPendingApprover?.empNo) {
+        const approverUser = await User.findOne({
+          empNo: firstPendingApprover.empNo,
+        });
+
+        if (approverUser) {
+          await createNotification({
+            title: "Task Approval Required",
+
+            message: `${creator.firstName} ${creator.lastName} created task "${title}" and assigned it for your approval.`,
+
+            module: "Task",
+
+            event: NOTIFICATION_EVENTS.TASK_APPROVAL_PENDING,
+
+            recipientEmployee: approverUser.empNo,
+
+            recipientEmail: approverUser.email,
+
+            createdByEmployee: creator.empNo,
+
+            createdByName: `${creator.firstName} ${creator.lastName}`,
+
+            icon: "task",
+
+            color: "#2196F3",
+
+            route: "/project-task",
+
+            referenceId: taskId,
+
+            referenceType: "Task",
+
+            metadata: {
+              taskId,
+
+              projectId,
+
+              taskTitle: title,
+
+              priority,
+
+              deadline,
+
+              assignedTo: assignTo.empNo,
+
+              approvalRole: firstPendingApprover.role,
+            },
+          });
+        }
+      }
+
+      // ----------------------------------------
+      // DIRECTLY APPROVED
+      // ----------------------------------------
+      else {
+        const assignedEmployee = await User.findOne({
+          empNo: assignTo.empNo,
+        });
+
+        if (assignedEmployee) {
+          await createNotification({
+            title: "New Task Assigned",
+
+            message: `You have been assigned a new task "${title}".`,
+
+            module: "Task",
+
+            event: NOTIFICATION_EVENTS.TASK_ASSIGNED,
+
+            recipientEmployee: assignedEmployee.empNo,
+
+            recipientEmail: assignedEmployee.email,
+
+            createdByEmployee: creator.empNo,
+
+            createdByName: `${creator.firstName} ${creator.lastName}`,
+
+            icon: "assignment_ind",
+
+            color: "#4CAF50",
+
+            route: "/project-task",
+
+            referenceId: taskId,
+
+            referenceType: "Task",
+
+            metadata: {
+              taskId,
+
+              projectId,
+
+              taskTitle: title,
+
+              priority,
+
+              deadline,
+            },
+          });
+        }
+      }
+    } catch (notificationError) {
+      console.error("❌ Task notification failed:", notificationError.message);
+    }
+
     res.status(201).json({
       status: "success",
       message: "Task created successfully",
@@ -420,6 +743,68 @@ export const updateTaskStatus = async (req, res) => {
     project.updateAt = new Date();
 
     await project.save();
+
+    // ========================================
+    // TASK STATUS NOTIFICATION
+    // ========================================
+
+    try {
+      const employee = await User.findOne({
+        empNo: task.assignTo.empNo,
+      });
+
+      const creator = await User.findOne({
+        empNo: task.createdBy.empNo,
+      });
+
+      // Notify task creator
+      if (creator && creator.empNo !== updatedBy?.empNo) {
+        await createNotification({
+          title: "Task Status Updated",
+
+          message: `Task "${task.title}" status changed to "${status}".`,
+
+          module: "Task",
+
+          event: NOTIFICATION_EVENTS.TASK_STATUS_UPDATED,
+
+          recipientEmployee: creator.empNo,
+
+          recipientEmail: creator.email,
+
+          createdByEmployee: employee?.empNo || updatedBy?.empNo,
+
+          createdByName: employee
+            ? `${employee.firstName} ${employee.lastName}`
+            : "Employee",
+
+          icon: status === "Completed" ? "task_alt" : "update",
+
+          color: status === "Completed" ? "#4CAF50" : "#2196F3",
+
+          route: "/project-task",
+
+          referenceId: task.taskId,
+
+          referenceType: "Task",
+
+          metadata: {
+            taskId: task.taskId,
+
+            projectId: project.projectId,
+
+            taskTitle: task.title,
+
+            status,
+          },
+        });
+      }
+    } catch (notificationError) {
+      console.error(
+        "❌ Task status notification failed:",
+        notificationError.message,
+      );
+    }
 
     res.status(200).json({
       status: "success",
@@ -471,7 +856,7 @@ export const getTasksByProject = async (req, res) => {
     projects.forEach((project) => {
       (project.tasks || []).forEach((task) => {
         const hasPending = task.approvalStatus.some(
-          (s) => s.empNo === empNo && s.status === "Pending"
+          (s) => s.empNo === empNo && s.status === "Pending",
         );
         if (hasPending) {
           tasks.push({
@@ -530,7 +915,7 @@ export const approveRejectTask = async (req, res) => {
       (step) =>
         step.empNo === approverEmpNo &&
         step.role === role &&
-        step.status === "Pending"
+        step.status === "Pending",
     );
 
     console.log(pendingStep);
@@ -555,7 +940,7 @@ export const approveRejectTask = async (req, res) => {
       task.createdBy.empNo,
       flowSteps,
       task.approvalStatus,
-      approver.role
+      approver.role,
     );
 
     const nextPending = stepperData.find((step) => step.status === "Pending");
@@ -588,6 +973,171 @@ export const approveRejectTask = async (req, res) => {
     project.updateAt = new Date();
 
     await project.save();
+
+    // ========================================
+    // TASK APPROVAL NOTIFICATION
+    // ========================================
+
+    try {
+      const taskCreator = await User.findOne({
+        empNo: task.createdBy.empNo,
+      });
+
+      // ----------------------------------------
+      // TASK REJECTED
+      // ----------------------------------------
+
+      if (action === "Rejected") {
+        if (taskCreator) {
+          await createNotification({
+            title: "Task Rejected",
+
+            message: `Your task "${task.title}" was rejected by ${approver.firstName} ${approver.lastName}.`,
+
+            module: "Task",
+
+            event: NOTIFICATION_EVENTS.TASK_REJECTED,
+
+            recipientEmployee: taskCreator.empNo,
+
+            recipientEmail: taskCreator.email,
+
+            createdByEmployee: approver.empNo,
+
+            createdByName: `${approver.firstName} ${approver.lastName}`,
+
+            icon: "cancel",
+
+            color: "#F44336",
+
+            route: "/project-task",
+
+            referenceId: task.taskId,
+
+            referenceType: "Task",
+
+            metadata: {
+              taskId: task.taskId,
+
+              projectId: project.projectId,
+
+              taskTitle: task.title,
+
+              rejectedBy: approver.empNo,
+
+              rejectedByRole: role,
+
+              comments,
+            },
+          });
+        }
+      }
+
+      // ----------------------------------------
+      // TASK FULLY APPROVED
+      // ----------------------------------------
+      else if (!nextPending) {
+        const assignedEmployee = await User.findOne({
+          empNo: task.assignTo.empNo,
+        });
+
+        if (assignedEmployee) {
+          await createNotification({
+            title: "Task Assigned",
+
+            message: `Your task "${task.title}" has been approved and assigned to you.`,
+
+            module: "Task",
+
+            event: NOTIFICATION_EVENTS.TASK_APPROVED,
+
+            recipientEmployee: assignedEmployee.empNo,
+
+            recipientEmail: assignedEmployee.email,
+
+            createdByEmployee: approver.empNo,
+
+            createdByName: `${approver.firstName} ${approver.lastName}`,
+
+            icon: "task_alt",
+
+            color: "#4CAF50",
+
+            route: "/project-task",
+
+            referenceId: task.taskId,
+
+            referenceType: "Task",
+
+            metadata: {
+              taskId: task.taskId,
+
+              projectId: project.projectId,
+
+              taskTitle: task.title,
+
+              priority: task.priority,
+
+              deadline: task.deadline,
+            },
+          });
+        }
+      }
+
+      // ----------------------------------------
+      // NEXT APPROVER
+      // ----------------------------------------
+      else {
+        const nextApprover = await User.findOne({
+          empNo: nextPending.empNo,
+        });
+
+        if (nextApprover) {
+          await createNotification({
+            title: "Task Approval Required",
+
+            message: `Task "${task.title}" is waiting for your approval.`,
+
+            module: "Task",
+
+            event: TASK_APPROVAL_PENDING,
+
+            recipientEmployee: nextApprover.empNo,
+
+            recipientEmail: nextApprover.email,
+
+            createdByEmployee: approver.empNo,
+
+            createdByName: `${approver.firstName} ${approver.lastName}`,
+
+            icon: "approval",
+
+            color: "#FF9800",
+
+            route: "/project-task",
+
+            referenceId: task.taskId,
+
+            referenceType: "Task",
+
+            metadata: {
+              taskId: task.taskId,
+
+              projectId: project.projectId,
+
+              taskTitle: task.title,
+
+              approvalRole: nextPending.role,
+            },
+          });
+        }
+      }
+    } catch (notificationError) {
+      console.error(
+        "❌ Task approval notification failed:",
+        notificationError.message,
+      );
+    }
 
     res.status(200).json({
       status: "success",
