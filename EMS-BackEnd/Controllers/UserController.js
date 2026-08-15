@@ -1,4 +1,9 @@
-import { Type, User, UserReporting } from "../Models/UserModel.js";
+import {
+  EmployeeWish,
+  Type,
+  User,
+  UserReporting,
+} from "../Models/UserModel.js";
 import bcrypt from "bcrypt";
 import { getPresignedUrl } from "../storage/s3.config.js";
 import {
@@ -1007,10 +1012,401 @@ const getManagerWiseTeamLeaderWithEmployees = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("❌ Error in getManagerWiseTeamLeaderWithEmployees:", err);
     res.status(500).json({
       status: "fail",
       message: err.message,
+    });
+  }
+};
+
+const GetTodayPeopleMoments = async (req, res) => {
+  try {
+    // =========================================================
+    // TODAY
+    // =========================================================
+
+    const today = new Date();
+
+    const currentMonth = today.getMonth() + 1;
+    const currentDay = today.getDate();
+    const currentYear = today.getFullYear();
+
+    // =========================================================
+    // GET ACTIVE EMPLOYEES
+    // =========================================================
+
+    const users = await User.find({
+      roleId: { $ne: 1 }, // Never show Admin
+      status: { $regex: /^active$/i },
+    })
+      .select(
+        "empNo firstName lastName dob joiningDate designation department profileImage role roleId status",
+      )
+      .lean();
+
+    // =========================================================
+    // RESULT
+    // =========================================================
+
+    const birthdays = [];
+    const anniversaries = [];
+    const newJoinees = [];
+
+    // =========================================================
+    // DATE PARSER
+    // =========================================================
+
+    const parseDate = (value) => {
+      if (!value) {
+        return null;
+      }
+
+      const date = new Date(value);
+
+      if (isNaN(date.getTime())) {
+        return null;
+      }
+
+      return date;
+    };
+
+    // =========================================================
+    // EMPLOYEE FORMATTER
+    // =========================================================
+
+    const formatEmployee = async (user) => {
+      let profileImage = null;
+
+      if (user.profileImage) {
+        try {
+          profileImage = await getPresignedUrl(user.profileImage, 3600);
+        } catch (error) {
+          console.error(
+            `Profile image error for ${user.empNo}:`,
+            error.message,
+          );
+        }
+      }
+
+      return {
+        empNo: user.empNo,
+
+        name: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+
+        image: profileImage,
+
+        designation: user.designation || "",
+
+        department: user.department || "",
+      };
+    };
+
+    // =========================================================
+    // PROCESS USERS
+    // =========================================================
+
+    for (const user of users) {
+      // -------------------------------------------------------
+      // BIRTHDAY
+      // -------------------------------------------------------
+
+      const dob = parseDate(user.dob);
+
+      if (dob) {
+        const dobMonth = dob.getMonth() + 1;
+
+        const dobDay = dob.getDate();
+
+        if (dobMonth === currentMonth && dobDay === currentDay) {
+          birthdays.push(await formatEmployee(user));
+        }
+      }
+
+      // -------------------------------------------------------
+      // JOINING DATE
+      // -------------------------------------------------------
+
+      const joiningDate = parseDate(user.joiningDate);
+
+      if (joiningDate) {
+        const joiningMonth = joiningDate.getMonth() + 1;
+
+        const joiningDay = joiningDate.getDate();
+
+        const joiningYear = joiningDate.getFullYear();
+
+        // -----------------------------------------------------
+        // WORK ANNIVERSARY
+        // -----------------------------------------------------
+
+        if (
+          joiningMonth === currentMonth &&
+          joiningDay === currentDay &&
+          joiningYear < currentYear
+        ) {
+          anniversaries.push({
+            ...(await formatEmployee(user)),
+            yearsCompleted: currentYear - joiningYear,
+          });
+        }
+
+        // -----------------------------------------------------
+        // NEW JOINEE
+        // -----------------------------------------------------
+
+        if (
+          joiningMonth === currentMonth &&
+          joiningDay === currentDay &&
+          joiningYear === currentYear
+        ) {
+          newJoinees.push(await formatEmployee(user));
+        }
+      }
+    }
+
+    // =========================================================
+    // RESPONSE
+    // =========================================================
+
+    const total = birthdays.length + anniversaries.length + newJoinees.length;
+
+    return res.status(200).json({
+      status: "success",
+
+      message: "Today's people moments fetched successfully",
+
+      data: {
+        birthdays,
+
+        anniversaries,
+
+        newJoinees,
+
+        summary: {
+          birthdays: birthdays.length,
+
+          anniversaries: anniversaries.length,
+
+          newJoinees: newJoinees.length,
+
+          total,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("GetTodayPeopleMoments Error:", error);
+
+    return res.status(500).json({
+      status: "fail",
+
+      message: error.message,
+    });
+  }
+};
+
+const SendEmployeeWish = async (req, res) => {
+  try {
+    const { recipientEmpNo, occasionType, message } = req.body;
+
+    // ==========================================
+    // VALIDATION
+    // ==========================================
+
+    if (!recipientEmpNo || !occasionType || !message?.trim()) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Recipient, occasion and message are required",
+      });
+    }
+
+    if (!["birthday", "anniversary", "newJoinee"].includes(occasionType)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid occasion type",
+      });
+    }
+
+    // ==========================================
+    // GET SENDER
+    // ==========================================
+
+    const senderEmpNo = req.user?.empNo || req.body.senderEmpNo;
+
+    if (!senderEmpNo) {
+      return res.status(401).json({
+        status: "fail",
+        message: "Logged-in employee not found",
+      });
+    }
+
+    const sender = await User.findOne({
+      empNo: senderEmpNo,
+    });
+
+    if (!sender) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Sender employee not found",
+      });
+    }
+
+    // ==========================================
+    // GET RECIPIENT
+    // ==========================================
+
+    const recipient = await User.findOne({
+      empNo: recipientEmpNo,
+    });
+
+    if (!recipient) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Recipient employee not found",
+      });
+    }
+
+    // ==========================================
+    // CREATE WISH
+    // ==========================================
+
+    const wish = await EmployeeWish.create({
+      recipientEmpNo: recipient.empNo,
+
+      recipientName: `${recipient.firstName} ${recipient.lastName}`.trim(),
+
+      senderEmpNo: sender.empNo,
+
+      senderName: `${sender.firstName} ${sender.lastName}`.trim(),
+
+      senderDesignation: sender.designation || "",
+
+      senderDepartment: sender.department || "",
+
+      senderProfileImage: sender.profileImage || null,
+
+      occasionType,
+
+      message: message.trim(),
+    });
+
+    return res.status(201).json({
+      status: "success",
+      message: "Wish sent successfully",
+      data: {
+        wish,
+      },
+    });
+  } catch (error) {
+    console.error("SendEmployeeWish Error:", error);
+
+    return res.status(500).json({
+      status: "fail",
+      message: error.message,
+    });
+  }
+};
+
+const GetEmployeeWishes = async (req, res) => {
+  try {
+    const { EmpNo, occasionType } = req.body;
+
+    // ==========================================
+    // VALIDATION
+    // ==========================================
+
+    if (!EmpNo) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Login employee number is required",
+      });
+    }
+
+    // ==========================================
+    // VALIDATE OCCASION
+    // ==========================================
+
+    if (
+      occasionType &&
+      !["birthday", "anniversary", "newJoinee"].includes(occasionType)
+    ) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid occasion type",
+      });
+    }
+
+    // ==========================================
+    // BUILD QUERY
+    // ==========================================
+
+    const query = {
+      recipientEmpNo: EmpNo,
+    };
+
+    if (occasionType) {
+      query.occasionType = occasionType;
+    }
+
+    console.log("Get Wishes Query:", query);
+
+    // ==========================================
+    // GET WISHES
+    // ==========================================
+
+    const wishes = await EmployeeWish.find(query)
+      .sort({
+        createdAt: -1,
+      })
+      .lean();
+
+    // ==========================================
+    // FORMAT PROFILE IMAGE
+    // ==========================================
+
+    const formattedWishes = await Promise.all(
+      wishes.map(async (wish) => {
+        let profileImage = null;
+
+        if (wish.senderProfileImage) {
+          try {
+            profileImage = await getPresignedUrl(wish.senderProfileImage, 3600);
+          } catch (error) {
+            console.error(
+              `Wish profile image error for ${wish.senderEmpNo}:`,
+              error.message,
+            );
+          }
+        }
+
+        return {
+          _id: wish._id,
+          senderEmpNo: wish.senderEmpNo,
+          senderName: wish.senderName,
+          senderDesignation: wish.senderDesignation,
+          senderDepartment: wish.senderDepartment,
+          senderProfileImage: profileImage,
+          message: wish.message,
+          occasionType: wish.occasionType,
+          createdAt: wish.createdAt,
+        };
+      }),
+    );
+
+    return res.status(200).json({
+      status: "success",
+      message: "Wishes fetched successfully",
+
+      data: {
+        totalRecords: formattedWishes.length,
+        wishes: formattedWishes,
+      },
+    });
+  } catch (error) {
+    console.error("GetEmployeeWishes Error:", error);
+
+    return res.status(500).json({
+      status: "fail",
+      message: error.message,
     });
   }
 };
@@ -1027,4 +1423,7 @@ export {
   getManagerWiseTeamLeaders,
   getTeamLeaderWiseEmployees,
   getManagerWiseTeamLeaderWithEmployees,
+  GetTodayPeopleMoments,
+  SendEmployeeWish,
+  GetEmployeeWishes,
 };

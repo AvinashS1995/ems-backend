@@ -157,4 +157,61 @@ const typeSchema = new mongoose.Schema({
 
 const Type = mongoose.model("Type", typeSchema);
 
-export { User, UserReporting, Type };
+const employeeWishSchema = new mongoose.Schema(
+  {
+    recipientEmpNo: {
+      type: String,
+      required: true,
+      index: true,
+    },
+
+    recipientName: {
+      type: String,
+      required: true,
+    },
+    senderEmpNo: {
+      type: String,
+      required: true,
+    },
+    senderName: {
+      type: String,
+      required: true,
+    },
+    senderDesignation: {
+      type: String,
+      default: "",
+    },
+    senderDepartment: {
+      type: String,
+      default: "",
+    },
+    senderProfileImage: {
+      type: String,
+      default: null,
+    },
+    occasionType: {
+      type: String,
+      enum: ["birthday", "anniversary", "newJoinee"],
+      required: true,
+    },
+
+    message: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 150,
+    },
+
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  {
+    timestamps: true,
+  },
+);
+
+const EmployeeWish = mongoose.model("EmployeeWish", employeeWishSchema);
+
+export { User, UserReporting, Type, EmployeeWish };

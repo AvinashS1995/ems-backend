@@ -20,6 +20,9 @@ import {
   getManagerWiseTeamLeaderWithEmployees,
   getManagerWiseTeamLeaders,
   getTeamLeaderWiseEmployees,
+  GetTodayPeopleMoments,
+  GetEmployeeWishes,
+  SendEmployeeWish,
 } from "../Controllers/UserController.js";
 import upload from "../Middlewares/uploadMiddleware.js";
 import { authenticateToken } from "../Middlewares/verifyTokenMiddleware.js";
@@ -89,7 +92,7 @@ router.post(
   "/register-user",
   authenticateToken,
   upload.single("profileImage"),
-  CreateUser
+  CreateUser,
 );
 /**
  * @swagger
@@ -561,7 +564,138 @@ router.post("/get-team-leader-wise-employees", getTeamLeaderWiseEmployees);
  */
 router.post(
   "/get-manager-wise-teamleader-with-employees",
-  getManagerWiseTeamLeaderWithEmployees
+  getManagerWiseTeamLeaderWithEmployees,
+);
+/**
+ * @swagger
+ * /api/auth/get-today-celebrations-peoples:
+ *   post:
+ *     summary: Get today's birthdays, work anniversaries and new joinees
+ *     tags:
+ *       - User
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Today's people moments fetched successfully
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.post(
+  "/get-today-celebrations-peoples",
+  authenticateToken,
+  GetTodayPeopleMoments,
+);
+/**
+ * @swagger
+ * /api/auth/today-celebrations-peoples-send-wish:
+ *   post:
+ *     summary: Send a birthday, work anniversary, or new joinee wish
+ *     tags:
+ *       - User
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - recipientEmpNo
+ *               - occasionType
+ *               - message
+ *             properties:
+ *               recipientEmpNo:
+ *                 type: string
+ *               occasionType:
+ *                 type: string
+ *               message:
+ *                 type: string
+ *
+ *     responses:
+ *       201:
+ *         description: Wish sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: Wish sent successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     wish:
+ *                       type: object
+ *
+ *       400:
+ *         description: Invalid request
+ *
+ *       401:
+ *         description: Authentication required
+ *
+ *       404:
+ *         description: Sender or recipient employee not found
+ *
+ *       500:
+ *         description: Server error
+ */
+router.post(
+  "/today-celebrations-peoples-send-wish",
+  authenticateToken,
+  SendEmployeeWish,
+);
+/**
+ * @swagger
+ * /api/auth/get-today-celebrations-peoples-view-wishes:
+ *   post:
+ *     summary: Get wishes received by the logged-in employee
+ *     description: >
+ *       Returns only wishes received by the authenticated employee.
+ *       The recipient employee number is automatically obtained from
+ *       the JWT token and cannot be provided by the client.
+ *     tags:
+ *       - User
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               EmpNo:
+ *                 type: string
+ *               occasionType:
+ *                 type: string
+ *
+ *     responses:
+ *       200:
+ *         description: Wishes fetched successfully
+ *
+ *       401:
+ *         description: Authentication required
+ *
+ *       400:
+ *         description: Invalid occasion type
+ *
+ *       500:
+ *         description: Server error
+ */
+router.post(
+  "/get-today-celebrations-peoples-view-wishes",
+  authenticateToken,
+  GetEmployeeWishes,
 );
 
 export default router;
