@@ -24,17 +24,6 @@ const notificationSchema = new mongoose.Schema(
 
     module: {
       type: String,
-      // enum: [
-      //   "Attendance",
-      //   "Leave",
-      //   "Payroll",
-      //   "Project",
-      //   "Task",
-      //   "Meeting",
-      //   "Schedule",
-      //   "Popup",
-      //   "System",
-      // ],
       required: true,
       index: true,
     },
